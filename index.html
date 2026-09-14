@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   body { margin: 0; background: #0c1210; }
-  #auth-gate {
+  .auth-screen {
     min-height: 100vh;
     display: flex;
     align-items: center;
@@ -16,7 +16,7 @@
     background: #0c1210;
     font-family: 'IBM Plex Sans', -apple-system, sans-serif;
   }
-  #auth-form {
+  .auth-box {
     background: #12211c;
     border: 1px solid #26433a;
     border-radius: 10px;
@@ -25,7 +25,7 @@
     max-width: 320px;
     box-sizing: border-box;
   }
-  #auth-form .auth-title {
+  .auth-box .auth-title {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 13px;
     letter-spacing: 0.14em;
@@ -33,7 +33,7 @@
     font-weight: 600;
     margin-bottom: 20px;
   }
-  #auth-form label {
+  .auth-box label {
     display: block;
     font-family: 'IBM Plex Mono', monospace;
     font-size: 10px;
@@ -41,7 +41,7 @@
     color: #567065;
     margin-bottom: 4px;
   }
-  #auth-form input {
+  .auth-box input {
     width: 100%;
     background: #16281f;
     border: 1px solid #26433a;
@@ -53,8 +53,8 @@
     margin-bottom: 14px;
     font-family: 'IBM Plex Sans', sans-serif;
   }
-  #auth-form input:focus { outline: none; border-color: #a97a3a; }
-  #auth-form button {
+  .auth-box input:focus { outline: none; border-color: #a97a3a; }
+  .auth-box button {
     width: 100%;
     background: #e8a33d;
     border: 1px solid #e8a33d;
@@ -66,13 +66,30 @@
     font-size: 12px;
     cursor: pointer;
   }
-  #auth-error {
+  .auth-error-msg {
     color: #c9694f;
     font-size: 11.5px;
     margin-top: 10px;
     font-family: 'IBM Plex Mono', monospace;
     display: none;
   }
+  .auth-info-msg {
+    color: #8fb3a3;
+    font-size: 11.5px;
+    margin-top: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    display: none;
+    text-align: center;
+  }
+  .auth-forgot-link {
+    display: block;
+    text-align: center;
+    margin-top: 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: #567065;
+  }
+  .auth-forgot-link:hover { color: #8fb3a3; }
   #auth-signout-btn {
     background: none;
     border: 1px solid #567065;
@@ -752,16 +769,32 @@
 </head>
 <body>
 
-<div id="auth-gate">
-  <form id="auth-form">
-    <div class="auth-title">DOMINGO FAMILY HUB</div>
-    <label for="auth-email">EMAIL</label>
-    <input id="auth-email" type="email" autocomplete="username" required>
-    <label for="auth-password">PASSWORD</label>
-    <input id="auth-password" type="password" autocomplete="current-password" required>
-    <button type="submit">Sign in</button>
-    <div id="auth-error"></div>
-  </form>
+<div id="auth-gate" class="auth-screen">
+  <div class="auth-box">
+    <form id="auth-form">
+      <div class="auth-title">DOMINGO FAMILY HUB</div>
+      <label for="auth-email">EMAIL</label>
+      <input id="auth-email" type="email" autocomplete="username" required>
+      <label for="auth-password">PASSWORD</label>
+      <input id="auth-password" type="password" autocomplete="current-password" required>
+      <button type="submit">Sign in</button>
+      <div id="auth-error" class="auth-error-msg"></div>
+    </form>
+    <a href="#" id="auth-forgot-link" class="auth-forgot-link">Forgot password?</a>
+    <div id="auth-forgot-msg" class="auth-info-msg"></div>
+  </div>
+</div>
+
+<div id="reset-gate" class="auth-screen" style="display:none;">
+  <div class="auth-box">
+    <form id="reset-form">
+      <div class="auth-title">SET A NEW PASSWORD</div>
+      <label for="reset-password">NEW PASSWORD</label>
+      <input id="reset-password" type="password" autocomplete="new-password" required minlength="6">
+      <button type="submit">Update password</button>
+      <div id="reset-error" class="auth-error-msg"></div>
+    </form>
+  </div>
 </div>
 
 <div id="hub-root" style="display:none;">
@@ -777,6 +810,7 @@
     <button class="hub-tab" data-hubview="school">Private School Applications</button>
     <button class="hub-tab" data-hubview="household">Household To-Dos</button>
     <button class="hub-tab" data-hubview="travel">Travel Tracker</button>
+    <button class="hub-tab" data-hubview="settings">Settings</button>
   </div>
 
   <div id="view-home" class="hub-view active">
@@ -864,6 +898,28 @@
     <div id="trv-list"></div>
     <div class="tb-foot">shared board — anyone with the link can view and edit</div>
   </div>
+
+  <div id="view-settings" class="hub-view">
+    <div class="hub-section-label">WHO CAN ACCESS THIS HUB</div>
+    <div class="tb-detail-inner" style="padding-left:0;margin-bottom:14px;">
+      Adding an email below lets that person sign in and see everything, but it doesn't create
+      their login by itself — they also need an account in Supabase (Authentication → Users →
+      Create new user, with "Auto Confirm User" checked), using this exact same email.
+    </div>
+    <div id="settings-list"></div>
+    <div class="tb-form" style="margin-top:14px;">
+      <div class="tb-form-grid">
+        <div class="tb-field full">
+          <label>ADD EMAIL</label>
+          <input type="email" id="settings-new-email" placeholder="name@example.com">
+        </div>
+      </div>
+      <div class="tb-form-actions">
+        <button class="tb-btn primary" id="settings-add-btn">+ Add</button>
+      </div>
+    </div>
+    <div id="settings-error" class="auth-error-msg" style="margin-top:10px;"></div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -877,16 +933,23 @@
   var SUPABASE_ANON_KEY = 'sb_publishable_bh_bLscgArDKqENb02ldGA_d19QTJKL';
 
   var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  window.sb = sb; // shared client for the settings board below
 
   var gate = document.getElementById('auth-gate');
+  var resetGate = document.getElementById('reset-gate');
   var hubRoot = document.getElementById('hub-root');
   var form = document.getElementById('auth-form');
   var errorEl = document.getElementById('auth-error');
   var signoutBtn = document.getElementById('auth-signout-btn');
+  var forgotLink = document.getElementById('auth-forgot-link');
+  var forgotMsg = document.getElementById('auth-forgot-msg');
+  var resetForm = document.getElementById('reset-form');
+  var resetError = document.getElementById('reset-error');
   var authFired = false;
 
   function showApp() {
     gate.style.display = 'none';
+    resetGate.style.display = 'none';
     hubRoot.style.display = '';
     if (!authFired) {
       authFired = true;
@@ -896,7 +959,14 @@
 
   function showGate() {
     hubRoot.style.display = 'none';
+    resetGate.style.display = 'none';
     gate.style.display = 'flex';
+  }
+
+  function showResetGate() {
+    gate.style.display = 'none';
+    hubRoot.style.display = 'none';
+    resetGate.style.display = 'flex';
   }
 
   form.addEventListener('submit', async function(e) {
@@ -913,7 +983,36 @@
 
   signoutBtn.addEventListener('click', function() { sb.auth.signOut(); });
 
-  sb.auth.onAuthStateChange(function(_event, session) {
+  forgotLink.addEventListener('click', async function(e) {
+    e.preventDefault();
+    forgotMsg.style.display = 'none';
+    var email = document.getElementById('auth-email').value.trim();
+    if (!email) {
+      forgotMsg.textContent = 'Enter your email above first.';
+      forgotMsg.style.display = 'block';
+      return;
+    }
+    var redirectTo = window.location.origin + window.location.pathname;
+    var res = await sb.auth.resetPasswordForEmail(email, { redirectTo: redirectTo });
+    forgotMsg.textContent = res.error ? res.error.message : 'Check your email for a reset link.';
+    forgotMsg.style.display = 'block';
+  });
+
+  resetForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    resetError.style.display = 'none';
+    var newPassword = document.getElementById('reset-password').value;
+    var res = await sb.auth.updateUser({ password: newPassword });
+    if (res.error) {
+      resetError.textContent = res.error.message;
+      resetError.style.display = 'block';
+      return;
+    }
+    showApp();
+  });
+
+  sb.auth.onAuthStateChange(function(event, session) {
+    if (event === 'PASSWORD_RECOVERY') { showResetGate(); return; }
     if (session) showApp(); else showGate();
   });
 
@@ -2221,6 +2320,70 @@
 
   addToggle.addEventListener('click', () => {
     if (formOpen) { closeForm(); } else { openForm(null); }
+  });
+
+  window.addEventListener('hub:authenticated', load);
+})();
+</script>
+
+<script>
+(function() {
+  var listEl = document.getElementById('settings-list');
+  var addBtn = document.getElementById('settings-add-btn');
+  var emailInput = document.getElementById('settings-new-email');
+  var errorEl = document.getElementById('settings-error');
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function showError(msg) {
+    errorEl.textContent = msg;
+    errorEl.style.display = 'block';
+  }
+
+  async function load() {
+    errorEl.style.display = 'none';
+    var res = await window.sb.from('allowed_emails').select('email').order('added_at');
+    if (res.error) { showError(res.error.message); return; }
+    render(res.data.map(function(r) { return r.email; }));
+  }
+
+  function render(emails) {
+    listEl.innerHTML = '';
+    emails.forEach(function(email) {
+      var row = document.createElement('div');
+      row.className = 'pt-item';
+      row.innerHTML =
+        '<div class="pt-item-text"><span class="pt-item-label">' + escapeHtml(email) + '</span></div>' +
+        '<button class="pt-item-del" data-remove="' + escapeHtml(email) + '" title="Remove">✕</button>';
+      listEl.appendChild(row);
+    });
+    listEl.querySelectorAll('[data-remove]').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        if (emails.length <= 1) {
+          showError("Can't remove the last allowed email — that would lock everyone out.");
+          return;
+        }
+        errorEl.style.display = 'none';
+        var email = btn.getAttribute('data-remove');
+        var res = await window.sb.from('allowed_emails').delete().eq('email', email);
+        if (res.error) { showError(res.error.message); return; }
+        load();
+      });
+    });
+  }
+
+  addBtn.addEventListener('click', async function() {
+    errorEl.style.display = 'none';
+    var email = emailInput.value.trim().toLowerCase();
+    if (!email) return;
+    var res = await window.sb.from('allowed_emails').insert({ email: email });
+    if (res.error) { showError(res.error.message); return; }
+    emailInput.value = '';
+    load();
   });
 
   window.addEventListener('hub:authenticated', load);
