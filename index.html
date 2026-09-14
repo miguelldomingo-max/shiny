@@ -1867,11 +1867,18 @@
 
   let phases = [];
   const openPhases = {};
+  const openItems = {};
 
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  function formatDue(dateStr) {
+    const parts = dateStr.split('-').map(Number);
+    const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
   }
 
   async function load() {
@@ -1945,15 +1952,45 @@
       itemsWrap.className = 'pt-items';
 
       phase.items.forEach(function(item) {
+        const isOpen = !!openItems[item.id];
         const row = document.createElement('div');
         row.className = 'pt-item';
         row.innerHTML =
           '<input type="checkbox" ' + (item.done ? 'checked' : '') + ' data-toggle="' + item.id + '">' +
           '<div class="pt-item-text">' +
-            '<span class="pt-item-label' + (item.done ? ' done' : '') + '" data-toggle="' + item.id + '">' + escapeHtml(item.label) + '</span>' +
+            '<span class="pt-item-label' + (item.done ? ' done' : '') + '" data-expand="' + item.id + '">' + escapeHtml(item.label) + '</span>' +
+            (item.dueDate ? '<span class="pt-item-tag">DUE ' + escapeHtml(formatDue(item.dueDate)) + '</span>' : '') +
           '</div>' +
+          '<span class="pt-phase-chevron' + (isOpen ? ' open' : '') + '" data-expand="' + item.id + '" style="cursor:pointer;">\u203a</span>' +
           '<button class="pt-item-del" data-del="' + item.id + '" title="Remove">\u2715</button>';
         itemsWrap.appendChild(row);
+
+        if (isOpen) {
+          const detail = document.createElement('div');
+          detail.className = 'tb-form';
+          detail.style.margin = '4px 0 10px';
+          detail.setAttribute('data-item-detail', item.id);
+          detail.innerHTML =
+            '<div class="tb-form-grid">' +
+              '<div class="tb-field full">' +
+                '<label>TASK</label>' +
+                '<input type="text" data-field="label" value="' + escapeHtml(item.label) + '">' +
+              '</div>' +
+              '<div class="tb-field full">' +
+                '<label>DETAILS</label>' +
+                '<textarea data-field="notes">' + escapeHtml(item.notes || '') + '</textarea>' +
+              '</div>' +
+              '<div class="tb-field">' +
+                '<label>DUE DATE</label>' +
+                '<input type="date" data-field="dueDate" value="' + escapeHtml(item.dueDate || '') + '">' +
+              '</div>' +
+            '</div>' +
+            '<div class="tb-form-actions">' +
+              '<button class="tb-btn secondary" data-close-detail="' + item.id + '">Close</button>' +
+              '<button class="tb-btn primary" data-save-detail="' + item.id + '">Save</button>' +
+            '</div>';
+          itemsWrap.appendChild(detail);
+        }
       });
 
       const addRow = document.createElement('div');
@@ -1988,6 +2025,40 @@
         phases.forEach(function(p) { p.items = p.items.filter(function(i) { return i.id !== id; }); });
         await save();
         render();
+      });
+    });
+
+    phasesEl.querySelectorAll('[data-expand]').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const id = el.getAttribute('data-expand');
+        openItems[id] = !openItems[id];
+        render();
+      });
+    });
+
+    phasesEl.querySelectorAll('[data-close-detail]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        openItems[btn.getAttribute('data-close-detail')] = false;
+        render();
+      });
+    });
+
+    phasesEl.querySelectorAll('[data-save-detail]').forEach(function(btn) {
+      btn.addEventListener('click', async function(e) {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-save-detail');
+        const detail = btn.closest('[data-item-detail]');
+        const item = allItems().find(function(i) { return i.id === id; });
+        if (item && detail) {
+          const newLabel = detail.querySelector('[data-field="label"]').value.trim();
+          item.label = newLabel || item.label;
+          item.notes = detail.querySelector('[data-field="notes"]').value;
+          item.dueDate = detail.querySelector('[data-field="dueDate"]').value;
+          await save();
+          render();
+        }
       });
     });
 
