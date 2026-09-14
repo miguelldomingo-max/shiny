@@ -1032,12 +1032,31 @@
       code === 'PGRST301' || code === '401';
   }
 
+  // A hung request (no error, no response) would otherwise leave a board
+  // stuck blank forever with nothing to catch. Race it against a timeout
+  // so it always resolves one way or another within 10s, and treat a
+  // timeout as a likely-broken session too, same as an explicit auth error.
+  function withTimeout(promise, ms) {
+    return new Promise(function(resolve, reject) {
+      var timer = setTimeout(function() {
+        reject(new Error('Request timed out after ' + (ms / 1000) + 's'));
+      }, ms);
+      promise.then(function(v) { clearTimeout(timer); resolve(v); }, function(e) { clearTimeout(timer); reject(e); });
+    });
+  }
+
   // Shim matching the interface every board already calls
   // (window.storage.get/set) so none of the board scripts below need
   // to change — only their trailing `load();` becomes an event listener.
   window.storage = {
     get: async function(key) {
-      var res = await sb.from('hub_data').select('value').eq('key', key).maybeSingle();
+      var res;
+      try {
+        res = await withTimeout(sb.from('hub_data').select('value').eq('key', key).maybeSingle(), 10000);
+      } catch (e) {
+        sb.auth.signOut();
+        throw e;
+      }
       if (res.error) {
         if (isAuthError(res.error)) sb.auth.signOut();
         throw res.error;
@@ -1045,7 +1064,13 @@
       return res.data ? { value: JSON.stringify(res.data.value) } : null;
     },
     set: async function(key, value) {
-      var res = await sb.from('hub_data').upsert({ key: key, value: JSON.parse(value), updated_at: new Date().toISOString() });
+      var res;
+      try {
+        res = await withTimeout(sb.from('hub_data').upsert({ key: key, value: JSON.parse(value), updated_at: new Date().toISOString() }), 10000);
+      } catch (e) {
+        sb.auth.signOut();
+        throw e;
+      }
       if (res.error) {
         if (isAuthError(res.error)) sb.auth.signOut();
         throw res.error;
