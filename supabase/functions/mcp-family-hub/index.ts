@@ -161,8 +161,15 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { headers: CORS_HEADERS });
   }
 
+  // Accept the shared secret either as a Bearer header (preferred, if the
+  // connector UI supports custom headers) or as a `?secret=` query param on
+  // the URL itself (fallback, since a URL is the one thing every MCP
+  // connector UI lets you configure).
   const authHeader = req.headers.get("authorization") || "";
-  const token = authHeader.replace(/^Bearer\s+/i, "");
+  const headerToken = authHeader.replace(/^Bearer\s+/i, "");
+  const url = new URL(req.url);
+  const queryToken = url.searchParams.get("secret") || "";
+  const token = headerToken || queryToken;
   if (token !== MCP_SHARED_SECRET) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
