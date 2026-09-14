@@ -2106,6 +2106,8 @@
   let editingId = null;
   let formOpen = false;
   const openDayIndex = {};
+  const openHbh = {};
+  const openDetail = {};
 
   const today = new Date();
   today.setHours(0,0,0,0);
@@ -2178,6 +2180,67 @@
     return div.innerHTML;
   }
 
+  function renderHbh(trip) {
+    const itin = trip.itinerary || [];
+    const addDayForm =
+      '<div class="tb-form" style="margin-top:10px;">' +
+        '<div class="tb-form-grid">' +
+          '<div class="tb-field"><label>DAY (e.g. TUE 10/6)</label><input type="text" data-newday-label placeholder="TUE 10/6"></div>' +
+          '<div class="tb-field"><label>DAY TITLE</label><input type="text" data-newday-title placeholder="Travel day"></div>' +
+        '</div>' +
+        '<div class="tb-form-actions">' +
+          '<button class="tb-btn primary" data-add-day="' + trip.id + '">+ Add day</button>' +
+        '</div>' +
+      '</div>';
+
+    if (itin.length === 0) {
+      return '<div class="tb-hbh">' +
+        '<div class="tb-hbh-empty">No hour-by-hour built for this trip yet.</div>' +
+        addDayForm +
+      '</div>';
+    }
+
+    const activeIdx = Math.min(openDayIndex[trip.id] || 0, itin.length - 1);
+    openDayIndex[trip.id] = activeIdx;
+    const active = itin[activeIdx];
+
+    const tabs = itin.map((d, i) => (
+      '<button class="tb-daytab' + (i === activeIdx ? ' active' : '') + '" data-daytab="' + trip.id + '::' + i + '">' + escapeHtml(d.day) + '</button>'
+    )).join('');
+
+    const stops = active.stops.map((s, si) => (
+      '<div class="tb-stop">' +
+        '<div class="tb-stop-time">' + escapeHtml(s.time) + '</div>' +
+        '<div class="tb-stop-body">' +
+          '<div class="tb-stop-title">' + escapeHtml(s.title) + '</div>' +
+          (s.detail ? '<div class="tb-stop-detail">' + escapeHtml(s.detail) + '</div>' : '') +
+        '</div>' +
+        '<button class="tb-link-btn del" data-del-stop="' + trip.id + '::' + activeIdx + '::' + si + '" title="Remove stop">✕</button>' +
+      '</div>'
+    )).join('');
+
+    return '<div class="tb-hbh">' +
+      '<div class="tb-daytabs">' + tabs + '</div>' +
+      '<div class="tb-daylabel-row" style="display:flex;justify-content:space-between;align-items:baseline;">' +
+        '<div class="tb-daylabel">' + escapeHtml(active.day) + ' — ' + escapeHtml(active.label) + '</div>' +
+        '<button class="tb-link-btn del" data-del-day="' + trip.id + '::' + activeIdx + '">Remove day</button>' +
+      '</div>' +
+      (stops || '<div class="tb-hbh-empty">No stops yet.</div>') +
+      '<div class="tb-form" style="margin-top:10px;">' +
+        '<div class="tb-form-grid">' +
+          '<div class="tb-field"><label>TIME</label><input type="text" data-newstop-time placeholder="e.g. 3:55 PM"></div>' +
+          '<div class="tb-field"><label>TITLE</label><input type="text" data-newstop-title placeholder="e.g. Depart SEA"></div>' +
+          '<div class="tb-field full"><label>DETAIL (optional)</label><input type="text" data-newstop-detail placeholder=""></div>' +
+        '</div>' +
+        '<div class="tb-form-actions">' +
+          '<button class="tb-btn primary" data-add-stop="' + trip.id + '::' + activeIdx + '">+ Add stop</button>' +
+        '</div>' +
+      '</div>' +
+      addDayForm +
+      (trip.itinSource ? '<div class="tb-hbh-source">' + escapeHtml(trip.itinSource) + '</div>' : '') +
+    '</div>';
+  }
+
   function buildRow(trip) {
     const d = daysUntil(trip.start, trip.end);
     const row = document.createElement('div');
@@ -2203,21 +2266,23 @@
         '</div>' +
         '<div class="tb-status ' + trip.status + '">' + statusLabel + '</div>' +
       '</div>' +
-      '<div class="tb-detail" id="trv-detail-' + trip.id + '">' +
+      '<div class="tb-detail' + (openDetail[trip.id] ? ' open' : '') + '" id="trv-detail-' + trip.id + '">' +
         '<div class="tb-detail-inner">' +
           (trip.notes ? escapeHtml(trip.notes) : '<em style="color:var(--sage-dim)">No notes yet.</em>') +
           '<div class="tb-detail-actions">' +
             '<button class="tb-link-btn edit" data-edit="' + trip.id + '">Edit</button>' +
             '<button class="tb-link-btn del" data-del="' + trip.id + '">Remove</button>' +
+            '<button class="tb-link-btn hbh" data-hbh="' + trip.id + '">Hour by hour ' + (openHbh[trip.id] ? '↑' : '↓') + '</button>' +
           '</div>' +
+          '<div id="hbh-slot-' + trip.id + '">' + (openHbh[trip.id] ? renderHbh(trip) : '') + '</div>' +
         '</div>' +
       '</div>';
 
     row.querySelector('.tb-row-top').addEventListener('click', () => {
-      const detail = row.querySelector('.tb-detail');
-      const isOpen = detail.classList.contains('open');
-      listEl.querySelectorAll('.tb-detail.open').forEach(el => el.classList.remove('open'));
-      if (!isOpen) detail.classList.add('open');
+      const isOpen = !!openDetail[trip.id];
+      Object.keys(openDetail).forEach(k => { openDetail[k] = false; });
+      openDetail[trip.id] = !isOpen;
+      render();
     });
 
     return row;
@@ -2316,6 +2381,80 @@
         e.stopPropagation();
         const id = btn.getAttribute('data-del');
         trips = trips.filter(t => t.id !== id);
+        await save();
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-hbh]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-hbh');
+        openHbh[id] = !openHbh[id];
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-daytab]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const [tripId, idx] = btn.getAttribute('data-daytab').split('::');
+        openDayIndex[tripId] = parseInt(idx, 10);
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-add-day]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const tripId = btn.getAttribute('data-add-day');
+        const panel = btn.closest('.tb-hbh');
+        const dayLabel = panel.querySelector('[data-newday-label]').value.trim();
+        const dayTitle = panel.querySelector('[data-newday-title]').value.trim();
+        if (!dayLabel) return;
+        const trip = trips.find(t => t.id === tripId);
+        trip.itinerary = trip.itinerary || [];
+        trip.itinerary.push({ day: dayLabel, label: dayTitle, stops: [] });
+        openDayIndex[tripId] = trip.itinerary.length - 1;
+        await save();
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-del-day]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const [tripId, dayIdx] = btn.getAttribute('data-del-day').split('::');
+        const trip = trips.find(t => t.id === tripId);
+        trip.itinerary.splice(parseInt(dayIdx, 10), 1);
+        openDayIndex[tripId] = 0;
+        await save();
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-add-stop]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const [tripId, dayIdx] = btn.getAttribute('data-add-stop').split('::');
+        const panel = btn.closest('.tb-hbh');
+        const time = panel.querySelector('[data-newstop-time]').value.trim();
+        const title = panel.querySelector('[data-newstop-title]').value.trim();
+        const detail = panel.querySelector('[data-newstop-detail]').value.trim();
+        if (!title) return;
+        const trip = trips.find(t => t.id === tripId);
+        trip.itinerary[parseInt(dayIdx, 10)].stops.push({ time: time || '—', title, detail });
+        await save();
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-del-stop]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const [tripId, dayIdx, stopIdx] = btn.getAttribute('data-del-stop').split('::');
+        const trip = trips.find(t => t.id === tripId);
+        trip.itinerary[parseInt(dayIdx, 10)].stops.splice(parseInt(stopIdx, 10), 1);
         await save();
         render();
       });
