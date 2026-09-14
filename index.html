@@ -1019,18 +1019,37 @@
     if (session) showApp(); else showGate();
   });
 
+  // A stale/invalid session (e.g. a refresh token invalidated by logging
+  // the same account in on another device) otherwise leaves the app
+  // showing "logged in" with every board silently empty and no clear way
+  // to recover. Detect that case and force a clean sign-out instead, so
+  // it self-heals into an obvious "please log in again" rather than a
+  // confusing blank page.
+  function isAuthError(err) {
+    var msg = ((err && err.message) || '').toLowerCase();
+    var code = (err && err.code) || '';
+    return msg.indexOf('jwt') !== -1 || msg.indexOf('token') !== -1 ||
+      code === 'PGRST301' || code === '401';
+  }
+
   // Shim matching the interface every board already calls
   // (window.storage.get/set) so none of the board scripts below need
   // to change — only their trailing `load();` becomes an event listener.
   window.storage = {
     get: async function(key) {
       var res = await sb.from('hub_data').select('value').eq('key', key).maybeSingle();
-      if (res.error) throw res.error;
+      if (res.error) {
+        if (isAuthError(res.error)) sb.auth.signOut();
+        throw res.error;
+      }
       return res.data ? { value: JSON.stringify(res.data.value) } : null;
     },
     set: async function(key, value) {
       var res = await sb.from('hub_data').upsert({ key: key, value: JSON.parse(value), updated_at: new Date().toISOString() });
-      if (res.error) throw res.error;
+      if (res.error) {
+        if (isAuthError(res.error)) sb.auth.signOut();
+        throw res.error;
+      }
       return true;
     }
   };
