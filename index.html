@@ -1011,13 +1011,14 @@
     showApp();
   });
 
+  // onAuthStateChange alone covers both the initial load (it fires once
+  // immediately with the current session) and later changes, so a separate
+  // getSession() call here would race with it — e.g. a recovery link
+  // establishes a session, and that second call was winning the race and
+  // sending the user straight into the app instead of the reset screen.
   sb.auth.onAuthStateChange(function(event, session) {
     if (event === 'PASSWORD_RECOVERY') { showResetGate(); return; }
     if (session) showApp(); else showGate();
-  });
-
-  sb.auth.getSession().then(function(res) {
-    if (res.data.session) showApp(); else showGate();
   });
 
   // Shim matching the interface every board already calls
