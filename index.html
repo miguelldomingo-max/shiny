@@ -1291,6 +1291,7 @@
       trips = res && res.value ? JSON.parse(res.value) : SEED;
     } catch (e) {
       trips = SEED;
+      if (window.hubToast) window.hubToast("Couldn't load — " + (e && e.message || 'unknown error'), { error: true });
     }
     render();
   }
@@ -1659,6 +1660,7 @@
       phases = res && res.value ? JSON.parse(res.value) : SEED_PHASES;
     } catch (e) {
       phases = SEED_PHASES;
+      if (window.hubToast) window.hubToast("Couldn't load — " + (e && e.message || 'unknown error'), { error: true });
     }
     if (openPhases[phases[0] && phases[0].id] === undefined && phases.length) {
       // leave all collapsed by default except none forced open
@@ -1878,6 +1880,7 @@
       phases = res && res.value ? JSON.parse(res.value) : SEED_PHASES;
     } catch (e) {
       phases = SEED_PHASES;
+      if (window.hubToast) window.hubToast("Couldn't load — " + (e && e.message || 'unknown error'), { error: true });
     }
     render();
   }
@@ -2072,6 +2075,7 @@
       trips = res && res.value ? JSON.parse(res.value) : SEED;
     } catch (e) {
       trips = SEED;
+      if (window.hubToast) window.hubToast("Couldn't load — " + (e && e.message || 'unknown error'), { error: true });
     }
     render();
   }
