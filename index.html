@@ -1,0 +1,2231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Domingo Family Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #0c1210; }
+  #auth-gate {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0c1210;
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+  }
+  #auth-form {
+    background: #12211c;
+    border: 1px solid #26433a;
+    border-radius: 10px;
+    padding: 32px 28px;
+    width: 100%;
+    max-width: 320px;
+    box-sizing: border-box;
+  }
+  #auth-form .auth-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    color: #8fb3a3;
+    font-weight: 600;
+    margin-bottom: 20px;
+  }
+  #auth-form label {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: #567065;
+    margin-bottom: 4px;
+  }
+  #auth-form input {
+    width: 100%;
+    background: #16281f;
+    border: 1px solid #26433a;
+    color: #eef3ee;
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 13px;
+    box-sizing: border-box;
+    margin-bottom: 14px;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+  #auth-form input:focus { outline: none; border-color: #a97a3a; }
+  #auth-form button {
+    width: 100%;
+    background: #e8a33d;
+    border: 1px solid #e8a33d;
+    color: #1a1208;
+    font-weight: 600;
+    border-radius: 4px;
+    padding: 9px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  #auth-error {
+    color: #c9694f;
+    font-size: 11.5px;
+    margin-top: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    display: none;
+  }
+  #auth-signout-btn {
+    background: none;
+    border: 1px solid #567065;
+    color: #8fb3a3;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    align-self: center;
+  }
+  #auth-signout-btn:hover { border-color: #e8a33d; color: #e8a33d; }
+  #hub-root {
+    --bg: #0c1210;
+    --panel: #12211c;
+    --panel-2: #16281f;
+    --line: #26433a;
+    --amber: #e8a33d;
+    --amber-dim: #a97a3a;
+    --sage: #8fb3a3;
+    --sage-dim: #567065;
+    --ink: #eef3ee;
+    --danger: #c9694f;
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 28px 26px 30px;
+    max-width: 980px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 3px);
+  }
+  #hub-root * { box-sizing: border-box; }
+  .tb-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--line);
+    padding-bottom: 14px;
+    margin-bottom: 4px;
+  }
+  .tb-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    color: var(--sage);
+    font-weight: 600;
+  }
+  .tb-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--sage-dim);
+    margin-top: 4px;
+  }
+  .tb-add-btn {
+    background: none;
+    border: 1px solid var(--sage-dim);
+    color: var(--sage);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 7px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .tb-add-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+  .tb-filterbar {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 14px 0 6px;
+  }
+  .tb-filter-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    padding: 5px 11px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: none;
+    color: var(--sage-dim);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color .15s, color .15s;
+  }
+  .tb-filter-btn:hover { color: var(--sage); }
+  .tb-filter-btn.active { border-color: var(--amber-dim); color: var(--amber); }
+  .tb-schooltag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--sage-dim);
+    text-transform: uppercase;
+  }
+
+  /* hub shell */
+  .hub-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--line);
+    padding-bottom: 14px;
+    margin-bottom: 14px;
+  }
+  .hub-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    color: var(--sage);
+    font-weight: 600;
+  }
+  .hub-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--sage-dim);
+    margin-top: 4px;
+  }
+  .hub-tabs {
+    display: flex;
+    gap: 22px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 20px;
+  }
+  .hub-tab {
+    background: none;
+    border: none;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sage-dim);
+    padding: 0 0 10px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color .15s, border-color .15s;
+  }
+  .hub-tab:hover { color: var(--sage); }
+  .hub-tab.active { color: var(--amber); border-bottom-color: var(--amber); }
+  .hub-view { display: none; }
+  .hub-view.active { display: block; }
+  .hub-subtabs {
+    display: flex;
+    gap: 20px;
+    padding-bottom: 10px;
+    margin-bottom: 18px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .hub-subtab {
+    background: none;
+    border: none;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--sage-dim);
+    padding: 0 0 4px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color .15s, border-color .15s;
+  }
+  .hub-subtab:hover { color: var(--sage); }
+  .hub-subtab.active { color: var(--amber-dim); border-bottom-color: var(--amber-dim); }
+  .hub-subview { display: none; }
+  .hub-subview.active { display: block; }
+  .hub-section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    color: var(--sage-dim);
+    margin-bottom: 10px;
+  }
+
+  /* project tracker */
+  .pt-progress-wrap {
+    margin-bottom: 22px;
+  }
+  .pt-progress-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--sage-dim);
+    margin-bottom: 6px;
+  }
+  .pt-progress-pct { color: var(--amber); font-size: 13px; font-weight: 600; }
+  .pt-bar-track {
+    height: 6px;
+    background: var(--panel-2);
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  .pt-bar-fill {
+    height: 100%;
+    background: var(--amber);
+    transition: width .25s ease;
+  }
+  .pt-phase {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    background: var(--panel);
+    overflow: hidden;
+  }
+  .pt-phase-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 16px;
+    cursor: pointer;
+  }
+  .pt-phase-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .pt-phase-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--amber-dim);
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .pt-phase-name {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .pt-phase-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--sage-dim);
+    white-space: nowrap;
+  }
+  .pt-phase-count.done { color: var(--sage); }
+  .pt-phase-chevron {
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--sage-dim);
+    font-size: 11px;
+    margin-left: 12px;
+    transition: transform .15s ease;
+  }
+  .pt-phase-chevron.open { transform: rotate(90deg); }
+  .pt-phase-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .2s ease;
+  }
+  .pt-phase-body.open { max-height: 2000px; }
+  .pt-items {
+    padding: 2px 16px 12px;
+  }
+  .pt-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+  }
+  .pt-item:first-child { border-top: none; }
+  .pt-item input[type=checkbox] {
+    margin-top: 3px;
+    accent-color: var(--amber);
+    width: 15px; height: 15px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .pt-item-text { flex: 1; min-width: 0; }
+  .pt-item-label {
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.5;
+    cursor: pointer;
+  }
+  .pt-item-label.done {
+    color: var(--sage-dim);
+    text-decoration: line-through;
+  }
+  .pt-item-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+    color: var(--sage-dim);
+    text-transform: uppercase;
+    margin-left: 8px;
+  }
+  .pt-item-del {
+    background: none; border: none;
+    color: var(--danger);
+    opacity: 0.6;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0 2px;
+    flex-shrink: 0;
+  }
+  .pt-item-del:hover { opacity: 1; }
+  .pt-add-row {
+    display: flex;
+    gap: 8px;
+    padding: 10px 0 4px;
+  }
+  .pt-add-row input {
+    flex: 1;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12.5px;
+  }
+  .pt-add-row input:focus { outline: none; border-color: var(--amber-dim); }
+  .pt-add-row button {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--sage-dim);
+    background: none;
+    color: var(--sage);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .pt-add-row button:hover { border-color: var(--amber); color: var(--amber); }
+
+  /* application questions tab */
+  .pq-card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    padding: 18px 18px 8px;
+    margin-bottom: 18px;
+  }
+  .pq-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 12px;
+    margin-bottom: 14px;
+  }
+  .pq-card-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .pq-link-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    padding: 6px 13px;
+    border-radius: 5px;
+    border: 1px solid var(--amber-dim);
+    color: var(--amber);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .pq-link-btn:hover { border-color: var(--amber); background: rgba(232,163,61,0.08); }
+  .pq-category {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    color: var(--amber-dim);
+    margin-top: 14px;
+    padding-bottom: 5px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .pq-category:first-of-type { margin-top: 0; }
+
+  .tb-empty {
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--sage-dim);
+    font-size: 13px;
+    padding: 40px 4px;
+    text-align: center;
+    line-height: 1.7;
+  }
+
+  .tb-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+  }
+  @media (max-width: 620px) {
+    .tb-columns { grid-template-columns: 1fr; gap: 6px; }
+  }
+  .tb-column-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    color: var(--sage-dim);
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+  }
+  .tb-month-label {
+    grid-column: 1 / -1;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    color: var(--amber-dim);
+    margin-top: 16px;
+    padding-bottom: 4px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .tb-month-col {
+    min-width: 0;
+  }
+  .tb-month-placeholder {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--sage-dim);
+    opacity: 0.4;
+    padding: 16px 2px;
+  }
+  .tb-empty-col {
+    padding: 20px 2px;
+    text-align: left;
+    font-size: 12px;
+  }
+
+  .tb-row {
+    border-bottom: 1px solid var(--line);
+    padding: 16px 2px;
+    cursor: pointer;
+  }
+  .tb-row:first-of-type { padding-top: 18px; }
+  .tb-row-top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .tb-days {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--amber);
+    min-width: 52px;
+    text-align: right;
+    line-height: 1;
+  }
+  .tb-days.past { color: var(--sage-dim); }
+  .tb-days-unit {
+    display: block;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--amber-dim);
+    margin-top: 3px;
+    font-weight: 400;
+    text-align: right;
+  }
+  .tb-main { flex: 1; min-width: 0; }
+  .tb-dest {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+  }
+  .tb-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    color: var(--sage);
+    margin-top: 3px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .tb-dates { color: var(--sage); }
+  .tb-approx { color: var(--sage-dim); font-style: italic; }
+  .tb-status {
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .tb-status.confirmed { color: var(--amber); border-color: var(--amber-dim); }
+  .tb-status.planning { color: var(--sage); border-color: var(--sage-dim); }
+  .tb-status.researching { color: var(--sage-dim); }
+  .tb-status.break { color: var(--sage-dim); border-style: dashed; font-style: italic; }
+
+  .tb-detail {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .2s ease, margin-top .2s ease;
+  }
+  .tb-detail.open {
+    max-height: 3000px;
+    margin-top: 12px;
+  }
+  .tb-detail-inner {
+    font-size: 13px;
+    color: var(--sage);
+    line-height: 1.6;
+    padding-left: 66px;
+    padding-right: 4px;
+  }
+  .tb-detail-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+  }
+  .tb-link-btn {
+    background: none;
+    border: none;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: none;
+    display: inline-block;
+  }
+  .tb-link-btn.edit { color: var(--sage); }
+  .tb-link-btn.edit:hover { color: var(--amber); }
+  .tb-link-btn.del { color: var(--danger); opacity: 0.75; }
+  .tb-link-btn.del:hover { opacity: 1; }
+  .tb-link-btn.hbh { color: var(--amber-dim); }
+  .tb-link-btn.hbh:hover { color: var(--amber); }
+
+  /* hour by hour */
+  .tb-hbh {
+    margin-top: 14px;
+    border-top: 1px dashed var(--line);
+    padding-top: 12px;
+  }
+  .tb-daytabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .tb-daytab {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.03em;
+    padding: 5px 9px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    background: none;
+    color: var(--sage-dim);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tb-daytab.active {
+    border-color: var(--amber-dim);
+    color: var(--amber);
+  }
+  .tb-daylabel {
+    font-size: 12.5px;
+    color: var(--ink);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .tb-stop {
+    display: flex;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .tb-stop:last-child { border-bottom: none; }
+  .tb-stop-time {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--amber-dim);
+    min-width: 92px;
+    flex-shrink: 0;
+    line-height: 1.5;
+  }
+  .tb-stop-body { flex: 1; min-width: 0; }
+  .tb-stop-title {
+    font-size: 12.5px;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .tb-stop-detail {
+    font-size: 11.5px;
+    color: var(--sage-dim);
+    margin-top: 1px;
+    line-height: 1.4;
+  }
+  .tb-hbh-empty {
+    font-size: 12px;
+    color: var(--sage-dim);
+    font-style: italic;
+  }
+  .tb-hbh-source {
+    margin-top: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9.5px;
+    color: var(--sage-dim);
+    opacity: 0.8;
+  }
+
+  /* form */
+  .tb-form {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 18px;
+  }
+  .tb-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .tb-form-grid .full { grid-column: 1 / -1; }
+  .tb-field label {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--sage-dim);
+    margin-bottom: 4px;
+  }
+  .tb-field input, .tb-field select, .tb-field textarea {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    border-radius: 4px;
+    padding: 7px 8px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+  }
+  .tb-field textarea { resize: vertical; min-height: 44px; font-family: 'IBM Plex Sans', sans-serif; }
+  .tb-field input:focus, .tb-field select:focus, .tb-field textarea:focus {
+    outline: none;
+    border-color: var(--amber-dim);
+  }
+  .tb-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .tb-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 7px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .tb-btn.primary { background: var(--amber); border: 1px solid var(--amber); color: #1a1208; font-weight: 600; }
+  .tb-btn.secondary { background: none; border: 1px solid var(--line); color: var(--sage); }
+
+  .tb-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+  }
+  .tb-checkbox-row input { width: auto; }
+  .tb-checkbox-row label { margin: 0; font-size: 10px; }
+
+  .tb-foot {
+    margin-top: 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--sage-dim);
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+
+<div id="auth-gate">
+  <form id="auth-form">
+    <div class="auth-title">DOMINGO FAMILY HUB</div>
+    <label for="auth-email">EMAIL</label>
+    <input id="auth-email" type="email" autocomplete="username" required>
+    <label for="auth-password">PASSWORD</label>
+    <input id="auth-password" type="password" autocomplete="current-password" required>
+    <button type="submit">Sign in</button>
+    <div id="auth-error"></div>
+  </form>
+</div>
+
+<div id="hub-root" style="display:none;">
+  <div class="hub-head">
+    <div>
+      <div class="hub-title">DOMINGO FAMILY HUB</div>
+      <div class="hub-sub" id="tb-today"></div>
+    </div>
+    <button id="auth-signout-btn">Sign out</button>
+  </div>
+  <div class="hub-tabs">
+    <button class="hub-tab active" data-hubview="home">Home</button>
+    <button class="hub-tab" data-hubview="school">Private School Applications</button>
+    <button class="hub-tab" data-hubview="household">Household To-Dos</button>
+    <button class="hub-tab" data-hubview="travel">Travel Tracker</button>
+  </div>
+
+  <div id="view-home" class="hub-view active">
+    <div class="hub-section-label">NAVIGATE TO A HUB</div>
+    <div class="pq-card">
+      <div class="pq-card-head">
+        <div class="pq-card-title">🎓 Private School Applications</div>
+        <button class="pq-link-btn home-nav-btn" data-goto="school" style="cursor:pointer;">Open →</button>
+      </div>
+      <div class="tb-detail-inner" style="padding-left:0;">Key dates, application requirements, and the project tracker for Mika's EP / Overlake / Bush / Lakeside applications.</div>
+    </div>
+    <div class="pq-card">
+      <div class="pq-card-head">
+        <div class="pq-card-title">🏠 Household To-Dos</div>
+        <button class="pq-link-btn home-nav-btn" data-goto="household" style="cursor:pointer;">Open →</button>
+      </div>
+      <div class="tb-detail-inner" style="padding-left:0;">Finance/admin, insurance, house &amp; property, kids &amp; school, and more. Pure household items (Lia's care items live separately).</div>
+    </div>
+    <div class="pq-card">
+      <div class="pq-card-head">
+        <div class="pq-card-title">✈️ Travel Tracker</div>
+        <button class="pq-link-btn home-nav-btn" data-goto="travel" style="cursor:pointer;">Open →</button>
+      </div>
+      <div class="tb-detail-inner" style="padding-left:0;">Atlanta + Savannah (Oct), Hoodsport cabin (Nov), SoCal Thanksgiving (Nov), Whistler (Dec/New Year's), lined up against Mika's school breaks.</div>
+    </div>
+  </div>
+
+  <div id="view-school" class="hub-view">
+    <div class="hub-subtabs">
+      <button class="hub-subtab active" data-subview="dates">Key Dates</button>
+      <button class="hub-subtab" data-subview="questions">Application Questions</button>
+      <button class="hub-subtab" data-subview="tracker">Project Tracker</button>
+    </div>
+
+    <div id="subview-dates" class="hub-subview active">
+      <div class="tb-head">
+        <div class="hub-section-label">KEY DATES</div>
+        <button class="tb-add-btn" id="tb-add-toggle">+ Add item</button>
+      </div>
+      <div id="tb-filterbar" class="tb-filterbar"></div>
+      <div id="tb-form-slot"></div>
+      <div id="tb-list"></div>
+      <div class="tb-foot">shared board — anyone with the link can view and edit</div>
+    </div>
+
+    <div id="subview-questions" class="hub-subview">
+      <div class="hub-section-label">WHAT EACH SCHOOL ACTUALLY ASKS FOR</div>
+      <div id="pq-jumpnav" class="tb-filterbar"></div>
+      <div id="pq-list"></div>
+    </div>
+
+    <div id="subview-tracker" class="hub-subview">
+      <div class="hub-section-label">PROJECT TRACKER</div>
+      <div class="pt-progress-wrap">
+        <div class="pt-progress-head">
+          <span>OVERALL PROGRESS</span>
+          <span class="pt-progress-pct" id="pt-pct">0%</span>
+        </div>
+        <div class="pt-bar-track"><div class="pt-bar-fill" id="pt-bar" style="width:0%"></div></div>
+      </div>
+      <div id="pt-phases"></div>
+      <div class="tb-foot">shared board — anyone with the link can view and edit</div>
+    </div>
+  </div>
+
+  <div id="view-household" class="hub-view">
+    <div class="hub-section-label">HOUSEHOLD TO-DOS</div>
+    <div class="pt-progress-wrap">
+      <div class="pt-progress-head">
+        <span>OVERALL PROGRESS</span>
+        <span class="pt-progress-pct" id="hh-pct">0%</span>
+      </div>
+      <div class="pt-bar-track"><div class="pt-bar-fill" id="hh-bar" style="width:0%"></div></div>
+    </div>
+    <div id="hh-phases"></div>
+    <div class="tb-foot">shared board — anyone with the link can view and edit</div>
+  </div>
+
+  <div id="view-travel" class="hub-view">
+    <div class="tb-head">
+      <div class="hub-section-label">TRAVEL TRACKER</div>
+      <button class="tb-add-btn" id="trv-add-toggle">+ Add trip</button>
+    </div>
+    <div id="trv-form-slot"></div>
+    <div id="trv-list"></div>
+    <div class="tb-foot">shared board — anyone with the link can view and edit</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+(function() {
+  // TODO: replace with your Supabase project's URL and anon public key
+  // (Settings -> API in the Supabase dashboard). The anon key is safe to
+  // ship client-side — it's useless without a logged-in session, because
+  // Row Level Security on hub_data requires auth.role() = 'authenticated'.
+  var SUPABASE_URL = 'YOUR_SUPABASE_URL';
+  var SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  var gate = document.getElementById('auth-gate');
+  var hubRoot = document.getElementById('hub-root');
+  var form = document.getElementById('auth-form');
+  var errorEl = document.getElementById('auth-error');
+  var signoutBtn = document.getElementById('auth-signout-btn');
+  var authFired = false;
+
+  function showApp() {
+    gate.style.display = 'none';
+    hubRoot.style.display = '';
+    if (!authFired) {
+      authFired = true;
+      window.dispatchEvent(new Event('hub:authenticated'));
+    }
+  }
+
+  function showGate() {
+    hubRoot.style.display = 'none';
+    gate.style.display = 'flex';
+  }
+
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    errorEl.style.display = 'none';
+    var email = document.getElementById('auth-email').value.trim();
+    var password = document.getElementById('auth-password').value;
+    var res = await sb.auth.signInWithPassword({ email: email, password: password });
+    if (res.error) {
+      errorEl.textContent = res.error.message;
+      errorEl.style.display = 'block';
+    }
+  });
+
+  signoutBtn.addEventListener('click', function() { sb.auth.signOut(); });
+
+  sb.auth.onAuthStateChange(function(_event, session) {
+    if (session) showApp(); else showGate();
+  });
+
+  sb.auth.getSession().then(function(res) {
+    if (res.data.session) showApp(); else showGate();
+  });
+
+  // Shim matching the interface every board already calls
+  // (window.storage.get/set) so none of the board scripts below need
+  // to change — only their trailing `load();` becomes an event listener.
+  window.storage = {
+    get: async function(key) {
+      var res = await sb.from('hub_data').select('value').eq('key', key).maybeSingle();
+      if (res.error) throw res.error;
+      return res.data ? { value: JSON.stringify(res.data.value) } : null;
+    },
+    set: async function(key, value) {
+      var res = await sb.from('hub_data').upsert({ key: key, value: JSON.parse(value), updated_at: new Date().toISOString() });
+      if (res.error) throw res.error;
+      return true;
+    }
+  };
+})();
+</script>
+
+<script>
+(function() {
+  function switchHub(key) {
+    document.querySelectorAll('.hub-tab').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.hub-view').forEach(function(v) { v.classList.remove('active'); });
+    const btn = document.querySelector('.hub-tab[data-hubview="' + key + '"]');
+    if (btn) btn.classList.add('active');
+    const view = document.getElementById('view-' + key);
+    if (view) view.classList.add('active');
+  }
+
+  function switchSchoolSub(key) {
+    document.querySelectorAll('.hub-subtab').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.hub-subview').forEach(function(v) { v.classList.remove('active'); });
+    const btn = document.querySelector('.hub-subtab[data-subview="' + key + '"]');
+    if (btn) btn.classList.add('active');
+    const view = document.getElementById('subview-' + key);
+    if (view) view.classList.add('active');
+  }
+
+  document.querySelectorAll('.hub-tab').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      switchHub(btn.getAttribute('data-hubview'));
+    });
+  });
+
+  document.querySelectorAll('.hub-subtab').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      switchSchoolSub(btn.getAttribute('data-subview'));
+    });
+  });
+
+  document.querySelectorAll('.home-nav-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() { switchHub(btn.getAttribute('data-goto')); });
+  });
+})();
+</script>
+
+<script>
+  // Shared save-status toast, used by every board's save() function so
+  // storage failures are visible instead of only logged to the console.
+  window.hubToast = function(message, opts) {
+    opts = opts || {};
+    let el = document.getElementById('hub-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'hub-toast';
+      el.style.cssText = 'position:sticky;bottom:0;left:0;right:0;margin-top:16px;padding:10px 14px;border-radius:6px;font-family:"IBM Plex Mono",monospace;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:10;';
+      const hubRoot = document.getElementById('hub-root');
+      if (hubRoot) hubRoot.appendChild(el);
+    }
+    el.style.background = opts.error ? 'rgba(201,105,79,0.15)' : 'rgba(143,179,163,0.15)';
+    el.style.border = '1px solid ' + (opts.error ? 'var(--danger)' : 'var(--sage-dim)');
+    el.style.color = opts.error ? 'var(--danger)' : 'var(--sage)';
+    el.innerHTML = '<span>' + message + '</span>' +
+      (opts.retry ? '<button id="hub-toast-retry" style="background:none;border:1px solid currentColor;color:inherit;border-radius:4px;padding:4px 10px;font-family:inherit;font-size:11px;cursor:pointer;">Retry</button>' : '');
+    if (opts.retry) {
+      document.getElementById('hub-toast-retry').addEventListener('click', function() {
+        el.remove();
+        opts.retry();
+      });
+    }
+    if (!opts.error) {
+      clearTimeout(window._hubToastTimer);
+      window._hubToastTimer = setTimeout(function() { const t = document.getElementById('hub-toast'); if (t) t.remove(); }, 2200);
+    }
+  };
+</script>
+
+<script>
+  // Single source of truth for each school's application requirements,
+  // shared by the Key Dates view and the Application Questions tab.
+  window.SCHOOL_INFO = {
+    'eastside-prep': {
+      name: 'Eastside Prep',
+      link: 'https://www.eastsideprep.org/admissions/',
+      itin: [
+        { day: "ESSAYS & STATEMENT", label: "Written pieces",
+          stops: [
+            { time: "TBD", title: "Parent statement + student essay", detail: "Lengths not specified by EP — confirm with admissions." },
+            { time: "Required", title: "Video-response assessment", detail: "Includes a writing sample. Topic/format unclear — worth a call." }
+          ] },
+        { day: "RECS", label: "Teacher evaluations",
+          stops: [
+            { time: "x2", title: "2 teacher evaluations", detail: "From different disciplines." }
+          ] },
+        { day: "TESTING", label: "Standardized testing",
+          stops: [
+            { time: "Flexible", title: "ISEE or SSAT", detail: "Existing scores usable — unclear if waivable for all, confirm." }
+          ] },
+        { day: "LOGISTICS", label: "Other",
+          stops: [
+            { time: "Optional", title: "Parent interview (~30 min)", detail: "Recommended — likely low-downside, high-upside." },
+            { time: "$75", title: "Application fee", detail: "Waivable." }
+          ] }
+      ]
+    },
+    'overlake': {
+      name: 'Overlake',
+      link: 'https://www.overlake.org/admissions/apply',
+      itin: [
+        { day: "ESSAYS & STATEMENT", label: "Written pieces",
+          stops: [
+            { time: "4x150 words", title: "Parent Statement", detail: "4 prompts — not public until portal opens Oct 2, 2026." },
+            { time: "Questionnaire", title: "Character Skills Snapshot", detail: "Behavioral questionnaire, not a written essay." }
+          ] },
+        { day: "RECS", label: "Teacher recommendations",
+          stops: [
+            { time: "x2", title: "4th grade + 3rd grade primary teachers", detail: "Specific grade requirement for a 5th-grade applicant." }
+          ] },
+        { day: "TESTING", label: "Standardized testing",
+          stops: [
+            { time: "Current-year", title: "SSAT (code 5618) or ISEE (code 480073)", detail: "No published minimum score." }
+          ] },
+        { day: "LOGISTICS", label: "Other",
+          stops: [
+            { time: "Form", title: "3-year activities history", detail: "Required even for a 5th grader." },
+            { time: "In-person", title: "Group activity + content-knowledge exercise + ~1hr interview", detail: "Mika attends; parents tour separately." },
+            { time: "$60", title: "Application fee", detail: "Portal opens Oct 2, 2026, 9am PST." }
+          ] }
+      ]
+    },
+    'bush': {
+      name: 'Bush (stretch)',
+      link: 'https://www.bush.edu/admissions/applying-to-bush',
+      itin: [
+        { day: "ESSAYS & STATEMENT", label: "Written pieces",
+          stops: [
+            { time: "~150 words", title: "Parent statement", detail: "" },
+            { time: "100-250 words", title: "Student essay", detail: "" }
+          ] },
+        { day: "RECS", label: "Teacher evaluations",
+          stops: [
+            { time: "x2", title: "Humanities + math/science teachers", detail: "" }
+          ] },
+        { day: "TESTING", label: "Standardized testing",
+          stops: [
+            { time: "Test-flexible", title: "Existing SBA/MAP scores likely satisfy this", detail: "May not need a new ISEE/SSAT sitting." }
+          ] },
+        { day: "LOGISTICS", label: "Other",
+          stops: [
+            { time: "Jan 19, 2027", title: "Required in-person 5th Grade Student Visit", detail: "2:45–4:00pm. Format not published — ask admissions directly." },
+            { time: "$70", title: "Prelim application fee", detail: "Waivable." }
+          ] }
+      ]
+    },
+    'lakeside': {
+      name: 'Lakeside (6th gr., next year)',
+      link: 'https://www.lakesideschool.org/admissions/overview',
+      itin: [
+        { day: "ESSAYS & STATEMENT", label: "Written pieces",
+          stops: [
+            { time: "Student-written", title: "Student essay(s)", detail: "No adult help — a polished essay is explicitly flagged as a red flag." },
+            { time: "Required", title: "Parent statement", detail: "" }
+          ] },
+        { day: "RECS", label: "Evaluations & references",
+          stops: [
+            { time: "x2", title: "Humanities + math/science teachers", detail: "" },
+            { time: "1", title: "Personal reference", detail: "Someone who has observed the child in a group setting." }
+          ] },
+        { day: "TESTING", label: "Standardized testing",
+          stops: [
+            { time: "1 sitting only", title: "SSAT or ISEE, grades 6-9", detail: "Sept–Jan window. No official minimum score." }
+          ] },
+        { day: "LOGISTICS", label: "Other",
+          stops: [
+            { time: "No prep needed", title: "Group Admissions Activity", detail: "In-person or Zoom." },
+            { time: "Don't", title: "Send supplementary materials", detail: "Explicitly discouraged — sending extra hurts, not helps." },
+            { time: "This cycle's dates", title: "Prelim app Jan 14 · Final materials Jan 28", detail: "Shown for reference — these are for Fall 2027 entry; Mika's actual 6th-grade cycle (Fall 2028) will follow a similar pattern about a year later, dates TBD." }
+          ] }
+      ]
+    }
+  };
+</script>
+
+<script>
+(function() {
+  const STORAGE_KEY = 'listboard:mika-private-school-apps';
+  const root = document.getElementById('hub-root');
+  const listEl = document.getElementById('tb-list');
+  const formSlot = document.getElementById('tb-form-slot');
+  const addToggle = document.getElementById('tb-add-toggle');
+  const todayEl = document.getElementById('tb-today');
+
+  // EXAMPLE DATA — replace this with the user's actual trips/events.
+  // Each trip: { id, destination, start (YYYY-MM-DD), end (YYYY-MM-DD),
+  //   approx (bool, dates are estimated), status ('researching'|'planning'|'confirmed'|'break'),
+  //   notes (string), itinerary (array of day objects, or [] if none built yet), itinSource (string, or "") }
+  // Each itinerary day: { day: "TUE 10/6", label: "Short day title",
+  //   stops: [ { time: "3:55 PM", title: "Depart SEA", detail: "optional extra info" }, ... ] }
+  // Use status 'break' for the right-hand column (school breaks, blackout dates, etc.) —
+  // rename "MIKA'S SCHOOL BREAKS" in the column header below to whatever fits the user's second category,
+  // or delete the two-column split entirely for a single-column list if there's no second category.
+
+  const SEED = [];
+
+
+  let trips = [];
+  let editingId = null;
+  let formOpen = false;
+  let activeFilter = 'all';
+  const openDayIndex = {};
+  const filterbarEl = document.getElementById('tb-filterbar');
+
+  const SCHOOLS = [
+    { key: 'all', label: 'All' },
+    { key: 'eastside-prep', label: 'Eastside Prep' },
+    { key: 'overlake', label: 'Overlake' },
+    { key: 'bush', label: 'Bush' },
+    { key: 'lakeside', label: 'Lakeside' },
+    { key: 'general', label: 'General' }
+  ];
+  const SCHOOL_LABELS = { 'eastside-prep': 'Eastside Prep', 'overlake': 'Overlake', 'bush': 'Bush', 'lakeside': 'Lakeside', 'general': 'General' };
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  todayEl.textContent = today.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase();
+
+  function parseDate(s) {
+    const [y,m,d] = s.split('-').map(Number);
+    return new Date(y, m-1, d);
+  }
+
+  function fmtRange(start, end) {
+    const s = parseDate(start), e = parseDate(end);
+    const opts1 = { month: 'short', day: 'numeric' };
+    if (s.getTime() === e.getTime()) {
+      let str = s.toLocaleDateString('en-US', opts1);
+      if (s.getFullYear() !== today.getFullYear()) str += ', ' + s.getFullYear();
+      return str.toUpperCase();
+    }
+    const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
+    const opts2 = sameMonth ? { day: 'numeric' } : { month: 'short', day: 'numeric' };
+    let str = s.toLocaleDateString('en-US', opts1) + '\u2013' + e.toLocaleDateString('en-US', opts2);
+    if (s.getFullYear() !== today.getFullYear() || e.getFullYear() !== today.getFullYear()) {
+      str += ', ' + e.getFullYear();
+    }
+    return str.toUpperCase();
+  }
+
+  function daysUntil(start, end) {
+    const s = parseDate(start), e = parseDate(end);
+    const msPerDay = 86400000;
+    if (today > e) return { n: Math.round((today - e) / msPerDay), state: 'past' };
+    if (today >= s && today <= e) return { n: 0, state: 'now' };
+    return { n: Math.round((s - today) / msPerDay), state: 'future' };
+  }
+
+  async function load() {
+    try {
+      const res = await window.storage.get(STORAGE_KEY, true);
+      trips = res && res.value ? JSON.parse(res.value) : SEED;
+    } catch (e) {
+      trips = SEED;
+    }
+    render();
+  }
+
+  async function save() {
+    try {
+      const result = await window.storage.set(STORAGE_KEY, JSON.stringify(trips), true);
+      if (!result) throw new Error('Storage set returned no result');
+      if (window.hubToast) window.hubToast('Saved', {});
+    } catch (e) {
+      console.error('save failed', e);
+      if (window.hubToast) window.hubToast("Couldn't save your last change — " + (e.message || 'unknown error'), { error: true, retry: save });
+    }
+  }
+
+  function sortTrips(list) {
+    return [...list].sort((a, b) => {
+      const da = daysUntil(a.start, a.end), db = daysUntil(b.start, b.end);
+      const rank = { now: 0, future: 1, past: 2 };
+      if (rank[da.state] !== rank[db.state]) return rank[da.state] - rank[db.state];
+      if (da.state === 'past') return da.n - db.n;
+      return parseDate(a.start) - parseDate(b.start);
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function renderHbh(trip) {
+    const itin = trip.itinerary || [];
+    if (itin.length === 0) {
+      return '<div class="tb-hbh"><div class="tb-hbh-empty">No requirements breakdown yet.</div></div>';
+    }
+    if (openDayIndex[trip.id] === undefined) openDayIndex[trip.id] = 0;
+    const activeIdx = openDayIndex[trip.id];
+    const active = itin[activeIdx];
+
+    const tabs = itin.map((d, i) => (
+      '<button class="tb-daytab' + (i === activeIdx ? ' active' : '') + '" data-daytab="' + trip.id + '::' + i + '">' + d.day + '</button>'
+    )).join('');
+
+    const stops = active.stops.map(s => (
+      '<div class="tb-stop"><div class="tb-stop-time">' + escapeHtml(s.time) + '</div><div class="tb-stop-body"><div class="tb-stop-title">' + escapeHtml(s.title) + '</div>' +
+      (s.detail ? '<div class="tb-stop-detail">' + escapeHtml(s.detail) + '</div>' : '') + '</div></div>'
+    )).join('');
+
+    return '<div class="tb-hbh">' +
+      '<div class="tb-daytabs">' + tabs + '</div>' +
+      '<div class="tb-daylabel">' + escapeHtml(active.day) + ' \u2014 ' + escapeHtml(active.label) + '</div>' +
+      stops +
+      (trip.itinSource ? '<div class="tb-hbh-source">' + escapeHtml(trip.itinSource) + '</div>' : '') +
+      '</div>';
+  }
+
+  function buildRow(trip) {
+    const d = daysUntil(trip.start, trip.end);
+    const row = document.createElement('div');
+    row.className = 'tb-row';
+
+    let dayLabel, dayUnit;
+    if (d.state === 'now') { dayLabel = 'NOW'; dayUnit = 'traveling'; }
+    else if (d.state === 'past') { dayLabel = d.n; dayUnit = 'days ago'; }
+    else { dayLabel = d.n; dayUnit = d.n === 1 ? 'day out' : 'days out'; }
+
+    const STATUS_LABELS = { researching: 'Researching', planning: 'Drafting', confirmed: 'Submitted', break: 'Task / Date' };
+    const statusLabel = STATUS_LABELS[trip.status] || (trip.status.charAt(0).toUpperCase() + trip.status.slice(1));
+    const hasItin = trip.itinerary && trip.itinerary.length > 0;
+
+    row.innerHTML =
+      '<div class="tb-row-top">' +
+        '<div class="tb-days ' + (d.state === 'past' ? 'past' : '') + '">' + dayLabel + '<span class="tb-days-unit">' + dayUnit + '</span></div>' +
+        '<div class="tb-main">' +
+          '<div class="tb-dest">' + escapeHtml(trip.destination) + '</div>' +
+          '<div class="tb-meta">' +
+            '<span class="tb-dates">' + fmtRange(trip.start, trip.end) + '</span>' +
+            (trip.approx ? '<span class="tb-approx">est.</span>' : '') +
+            (trip.school ? '<span class="tb-schooltag">' + escapeHtml(SCHOOL_LABELS[trip.school] || trip.school) + '</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="tb-status ' + trip.status + '">' + statusLabel + '</div>' +
+      '</div>' +
+      '<div class="tb-detail" id="detail-' + trip.id + '">' +
+        '<div class="tb-detail-inner">' +
+          (trip.notes ? escapeHtml(trip.notes) : '<em style="color:var(--sage-dim)">No notes yet.</em>') +
+          '<div class="tb-detail-actions">' +
+            (trip.link ? '<a class="tb-link-btn hbh" href="' + escapeHtml(trip.link) + '" target="_blank" rel="noopener">Official page \u2197</a>' : '') +
+            '<button class="tb-link-btn edit" data-edit="' + trip.id + '">Edit</button>' +
+            '<button class="tb-link-btn del" data-del="' + trip.id + '">Remove</button>' +
+            (hasItin ? '<button class="tb-link-btn hbh" data-hbh="' + trip.id + '">Requirements \u2193</button>' : '') +
+          '</div>' +
+          '<div id="hbh-slot-' + trip.id + '"></div>' +
+        '</div>' +
+      '</div>';
+
+    row.querySelector('.tb-row-top').addEventListener('click', () => {
+      const detail = row.querySelector('.tb-detail');
+      const isOpen = detail.classList.contains('open');
+      listEl.querySelectorAll('.tb-detail.open').forEach(el => el.classList.remove('open'));
+      if (!isOpen) detail.classList.add('open');
+    });
+
+    return row;
+  }
+
+  function monthKey(dateStr) {
+    const d = parseDate(dateStr);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+
+  function monthLabel(dateStr) {
+    return parseDate(dateStr).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
+  }
+
+  function groupByMonth(list) {
+    const map = {};
+    list.forEach(t => {
+      const k = monthKey(t.start);
+      (map[k] = map[k] || []).push(t);
+    });
+    return map;
+  }
+
+  function buildFilterBar() {
+    const present = new Set(trips.map(t => t.school).filter(Boolean));
+    filterbarEl.innerHTML = SCHOOLS
+      .filter(s => s.key === 'all' || present.has(s.key))
+      .map(s => '<button class="tb-filter-btn' + (activeFilter === s.key ? ' active' : '') + '" data-filter="' + s.key + '">' + escapeHtml(s.label) + '</button>')
+      .join('');
+    filterbarEl.querySelectorAll('[data-filter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeFilter = btn.getAttribute('data-filter');
+        render();
+      });
+    });
+  }
+
+  function render() {
+    buildFilterBar();
+    const visible = activeFilter === 'all' ? trips : trips.filter(t => t.school === activeFilter);
+    const sorted = sortTrips(visible);
+    if (sorted.length === 0) {
+      listEl.innerHTML = '<div class="tb-empty">Nothing here yet.<br>Add an item to start tracking it.</div>';
+      return;
+    }
+    listEl.innerHTML = '';
+
+    const tripList = sorted.filter(t => t.status !== 'break');
+    const breakList = sorted.filter(t => t.status === 'break');
+    const tripsByMonth = groupByMonth(tripList);
+    const breaksByMonth = groupByMonth(breakList);
+    const monthKeys = Array.from(new Set([...Object.keys(tripsByMonth), ...Object.keys(breaksByMonth)])).sort();
+
+    const grid = document.createElement('div');
+    grid.className = 'tb-columns';
+
+    const headL = document.createElement('div');
+    headL.className = 'tb-column-title';
+    headL.textContent = 'APPLICATIONS';
+    const headR = document.createElement('div');
+    headR.className = 'tb-column-title';
+    headR.textContent = 'TASKS & KEY DATES';
+    grid.appendChild(headL);
+    grid.appendChild(headR);
+
+    monthKeys.forEach(key => {
+      const monthTrips = tripsByMonth[key] || [];
+      const monthBreaks = breaksByMonth[key] || [];
+      const sample = (monthTrips[0] || monthBreaks[0]);
+
+      const label = document.createElement('div');
+      label.className = 'tb-month-label';
+      label.textContent = monthLabel(sample.start);
+      grid.appendChild(label);
+
+      const colL = document.createElement('div');
+      colL.className = 'tb-month-col';
+      if (monthTrips.length === 0) {
+        const ph = document.createElement('div');
+        ph.className = 'tb-month-placeholder';
+        ph.textContent = '\u2014';
+        colL.appendChild(ph);
+      } else {
+        monthTrips.forEach(t => colL.appendChild(buildRow(t)));
+      }
+
+      const colR = document.createElement('div');
+      colR.className = 'tb-month-col';
+      if (monthBreaks.length === 0) {
+        const ph = document.createElement('div');
+        ph.className = 'tb-month-placeholder';
+        ph.textContent = '\u2014';
+        colR.appendChild(ph);
+      } else {
+        monthBreaks.forEach(t => colR.appendChild(buildRow(t)));
+      }
+
+      grid.appendChild(colL);
+      grid.appendChild(colR);
+    });
+
+    listEl.appendChild(grid);
+
+    listEl.querySelectorAll('[data-edit]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openForm(btn.getAttribute('data-edit'));
+      });
+    });
+    listEl.querySelectorAll('[data-del]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-del');
+        trips = trips.filter(t => t.id !== id);
+        await save();
+        render();
+      });
+    });
+    function bindDayTabs(slot) {
+      slot.querySelectorAll('[data-daytab]').forEach(tabBtn => {
+        tabBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const [tripId, idx] = tabBtn.getAttribute('data-daytab').split('::');
+          openDayIndex[tripId] = parseInt(idx, 10);
+          slot.innerHTML = renderHbh(trips.find(t => t.id === tripId));
+          bindDayTabs(slot);
+        });
+      });
+    }
+
+    listEl.querySelectorAll('[data-hbh]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-hbh');
+        const trip = trips.find(t => t.id === id);
+        const slot = document.getElementById('hbh-slot-' + id);
+        if (slot.innerHTML.trim() !== '') {
+          slot.innerHTML = '';
+          btn.textContent = 'Requirements \u2193';
+          return;
+        }
+        slot.innerHTML = renderHbh(trip);
+        btn.textContent = 'Requirements \u2191';
+        bindDayTabs(slot);
+      });
+    });
+  }
+
+  function openForm(id) {
+    editingId = id || null;
+    const trip = id ? trips.find(t => t.id === id) : null;
+    formOpen = true;
+    addToggle.textContent = 'Cancel';
+
+    formSlot.innerHTML =
+      '<div class="tb-form">' +
+        '<div class="tb-form-grid">' +
+          '<div class="tb-field full"><label>Title</label>' +
+          '<input type="text" id="f-dest" value="' + (trip ? escapeHtml(trip.destination) : '') + '" placeholder="e.g. Eastside Prep, or Call Bush admissions"></div>' +
+          '<div class="tb-field"><label>Start date</label>' +
+          '<input type="date" id="f-start" value="' + (trip ? trip.start : '') + '"></div>' +
+          '<div class="tb-field"><label>End date</label>' +
+          '<input type="date" id="f-end" value="' + (trip ? trip.end : '') + '"></div>' +
+          '<div class="tb-field"><label>Status</label>' +
+          '<select id="f-status">' +
+            '<option value="researching"' + (!trip || trip.status === 'researching' ? ' selected' : '') + '>Researching</option>' +
+            '<option value="planning"' + (trip && trip.status === 'planning' ? ' selected' : '') + '>Drafting</option>' +
+            '<option value="confirmed"' + (trip && trip.status === 'confirmed' ? ' selected' : '') + '>Submitted</option>' +
+            '<option value="break"' + (trip && trip.status === 'break' ? ' selected' : '') + '>Task / Date</option>' +
+          '</select></div>' +
+          '<div class="tb-field"><label>School</label>' +
+          '<select id="f-school">' +
+            '<option value="eastside-prep"' + (trip && trip.school === 'eastside-prep' ? ' selected' : '') + '>Eastside Prep</option>' +
+            '<option value="overlake"' + (trip && trip.school === 'overlake' ? ' selected' : '') + '>Overlake</option>' +
+            '<option value="bush"' + (trip && trip.school === 'bush' ? ' selected' : '') + '>Bush</option>' +
+            '<option value="lakeside"' + (trip && trip.school === 'lakeside' ? ' selected' : '') + '>Lakeside</option>' +
+            '<option value="general"' + (!trip || trip.school === 'general' ? ' selected' : '') + '>General</option>' +
+          '</select></div>' +
+          '<div class="tb-field"><div class="tb-checkbox-row" style="margin-top:22px;">' +
+            '<input type="checkbox" id="f-approx"' + (trip && trip.approx ? ' checked' : '') + '>' +
+            '<label for="f-approx">Dates are estimated</label></div></div>' +
+          '<div class="tb-field full"><label>Link (official page)</label>' +
+          '<input type="text" id="f-link" value="' + (trip ? escapeHtml(trip.link || '') : '') + '" placeholder="https://..."></div>' +
+          '<div class="tb-field full"><label>Notes</label>' +
+          '<textarea id="f-notes" placeholder="Any notes, links, details...">' + (trip ? escapeHtml(trip.notes || '') : '') + '</textarea></div>' +
+        '</div>' +
+        '<div class="tb-form-actions">' +
+          '<button class="tb-btn secondary" id="f-cancel">Cancel</button>' +
+          '<button class="tb-btn primary" id="f-save">' + (trip ? 'Save changes' : 'Add item') + '</button>' +
+        '</div>' +
+      '</div>';
+
+    document.getElementById('f-cancel').addEventListener('click', closeForm);
+    document.getElementById('f-save').addEventListener('click', submitForm);
+  }
+
+  function closeForm() {
+    formOpen = false;
+    editingId = null;
+    addToggle.textContent = '+ Add item';
+    formSlot.innerHTML = '';
+  }
+
+  async function submitForm() {
+    const dest = document.getElementById('f-dest').value.trim();
+    const start = document.getElementById('f-start').value;
+    const end = document.getElementById('f-end').value || start;
+    const status = document.getElementById('f-status').value;
+    const school = document.getElementById('f-school').value;
+    const approx = document.getElementById('f-approx').checked;
+    const link = document.getElementById('f-link').value.trim();
+    const notes = document.getElementById('f-notes').value.trim();
+
+    if (!dest || !start) return;
+
+    if (editingId) {
+      const t = trips.find(t => t.id === editingId);
+      Object.assign(t, { destination: dest, start, end, status, school, approx, link, notes });
+    } else {
+      trips.push({
+        id: 'trip-' + Date.now(),
+        destination: dest, start, end, status, school, approx, link, notes,
+        itinerary: [], itinSource: ''
+      });
+    }
+    await save();
+    closeForm();
+    render();
+  }
+
+  addToggle.addEventListener('click', () => {
+    if (formOpen) { closeForm(); } else { openForm(null); }
+  });
+
+  window.addEventListener('hub:authenticated', load);
+})();
+</script>
+
+<script>
+(function() {
+  const STORAGE_KEY = 'projecttracker:mika-private-school-apps';
+  const phasesEl = document.getElementById('pt-phases');
+  const pctEl = document.getElementById('pt-pct');
+  const barEl = document.getElementById('pt-bar');
+
+  // Each phase: { id, name, items: [ { id, label, done, tag } ] }
+  // tag is optional — which school an item applies to (or 'general').
+  const SEED_PHASES = [];
+
+  const TAG_LABELS = { 'eastside-prep': 'Eastside Prep', 'overlake': 'Overlake', 'bush': 'Bush', 'general': 'General' };
+
+  let phases = [];
+  const openPhases = {};
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  async function load() {
+    try {
+      const res = await window.storage.get(STORAGE_KEY, true);
+      phases = res && res.value ? JSON.parse(res.value) : SEED_PHASES;
+    } catch (e) {
+      phases = SEED_PHASES;
+    }
+    if (openPhases[phases[0] && phases[0].id] === undefined && phases.length) {
+      // leave all collapsed by default except none forced open
+    }
+    render();
+  }
+
+  async function save() {
+    try {
+      const result = await window.storage.set(STORAGE_KEY, JSON.stringify(phases), true);
+      if (!result) throw new Error('Storage set returned no result');
+      if (window.hubToast) window.hubToast('Saved', {});
+    } catch (e) {
+      console.error('save failed', e);
+      if (window.hubToast) window.hubToast("Couldn't save your last change — " + (e.message || 'unknown error'), { error: true, retry: save });
+    }
+  }
+
+  function allItems() {
+    return phases.reduce((acc, p) => acc.concat(p.items), []);
+  }
+
+  function updateProgress() {
+    const items = allItems();
+    const total = items.length;
+    const done = items.filter(i => i.done).length;
+    const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+    pctEl.textContent = pct + '%';
+    barEl.style.width = pct + '%';
+  }
+
+  function render() {
+    updateProgress();
+    phasesEl.innerHTML = '';
+
+    phases.forEach(function(phase, idx) {
+      const total = phase.items.length;
+      const done = phase.items.filter(i => i.done).length;
+      const isOpen = !!openPhases[phase.id];
+
+      const wrap = document.createElement('div');
+      wrap.className = 'pt-phase';
+
+      const head = document.createElement('div');
+      head.className = 'pt-phase-head';
+      head.innerHTML =
+        '<div class="pt-phase-title">' +
+          '<span class="pt-phase-num">' + (idx + 1) + '</span>' +
+          '<span class="pt-phase-name">' + escapeHtml(phase.name) + '</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;">' +
+          '<span class="pt-phase-count' + (total > 0 && done === total ? ' done' : '') + '">' + done + ' / ' + total + '</span>' +
+          '<span class="pt-phase-chevron' + (isOpen ? ' open' : '') + '">\u203A</span>' +
+        '</div>';
+      head.addEventListener('click', function() {
+        openPhases[phase.id] = !openPhases[phase.id];
+        render();
+      });
+      wrap.appendChild(head);
+
+      const body = document.createElement('div');
+      body.className = 'pt-phase-body' + (isOpen ? ' open' : '');
+
+      const itemsWrap = document.createElement('div');
+      itemsWrap.className = 'pt-items';
+
+      phase.items.forEach(function(item) {
+        const row = document.createElement('div');
+        row.className = 'pt-item';
+        row.innerHTML =
+          '<input type="checkbox" ' + (item.done ? 'checked' : '') + ' data-toggle="' + item.id + '">' +
+          '<div class="pt-item-text">' +
+            '<span class="pt-item-label' + (item.done ? ' done' : '') + '" data-toggle="' + item.id + '">' + escapeHtml(item.label) + '</span>' +
+            (item.tag ? '<span class="pt-item-tag">' + escapeHtml(TAG_LABELS[item.tag] || item.tag) + '</span>' : '') +
+          '</div>' +
+          '<button class="pt-item-del" data-del="' + item.id + '" title="Remove">\u2715</button>';
+        itemsWrap.appendChild(row);
+      });
+
+      const addRow = document.createElement('div');
+      addRow.className = 'pt-add-row';
+      addRow.innerHTML =
+        '<input type="text" placeholder="Add a task to this phase..." data-addinput="' + phase.id + '">' +
+        '<button data-addbtn="' + phase.id + '">+ Add</button>';
+      itemsWrap.appendChild(addRow);
+
+      body.appendChild(itemsWrap);
+      wrap.appendChild(body);
+      phasesEl.appendChild(wrap);
+    });
+
+    phasesEl.querySelectorAll('[data-toggle]').forEach(function(el) {
+      el.addEventListener('click', async function(e) {
+        e.stopPropagation();
+        const id = el.getAttribute('data-toggle');
+        const item = allItems().find(function(i) { return i.id === id; });
+        if (item) {
+          item.done = !item.done;
+          await save();
+          render();
+        }
+      });
+    });
+
+    phasesEl.querySelectorAll('[data-del]').forEach(function(btn) {
+      btn.addEventListener('click', async function(e) {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-del');
+        phases.forEach(function(p) { p.items = p.items.filter(function(i) { return i.id !== id; }); });
+        await save();
+        render();
+      });
+    });
+
+    phasesEl.querySelectorAll('[data-addbtn]').forEach(function(btn) {
+      btn.addEventListener('click', async function(e) {
+        e.stopPropagation();
+        const phaseId = btn.getAttribute('data-addbtn');
+        const input = phasesEl.querySelector('[data-addinput="' + phaseId + '"]');
+        const label = input.value.trim();
+        if (!label) return;
+        const phase = phases.find(function(p) { return p.id === phaseId; });
+        phase.items.push({ id: 'item-' + Date.now(), label: label, done: false, tag: 'general' });
+        openPhases[phaseId] = true;
+        await save();
+        render();
+      });
+    });
+
+    phasesEl.querySelectorAll('[data-addinput]').forEach(function(input) {
+      input.addEventListener('click', function(e) { e.stopPropagation(); });
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const phaseId = input.getAttribute('data-addinput');
+          phasesEl.querySelector('[data-addbtn="' + phaseId + '"]').click();
+        }
+      });
+    });
+  }
+
+  window.addEventListener('hub:authenticated', load);
+})();
+</script>
+
+<script>
+(function() {
+  const listEl = document.getElementById('pq-list');
+  const jumpEl = document.getElementById('pq-jumpnav');
+  const ORDER = ['eastside-prep', 'overlake', 'bush', 'lakeside'];
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function renderStops(stops) {
+    return stops.map(function(s) {
+      return '<div class="tb-stop"><div class="tb-stop-time">' + escapeHtml(s.time) + '</div>' +
+        '<div class="tb-stop-body"><div class="tb-stop-title">' + escapeHtml(s.title) + '</div>' +
+        (s.detail ? '<div class="tb-stop-detail">' + escapeHtml(s.detail) + '</div>' : '') +
+        '</div></div>';
+    }).join('');
+  }
+
+  function render() {
+    jumpEl.innerHTML = ORDER.map(function(key) {
+      return '<button class="tb-filter-btn" data-jump="' + key + '">' + escapeHtml(window.SCHOOL_INFO[key].name) + '</button>';
+    }).join('');
+    jumpEl.querySelectorAll('[data-jump]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.getElementById('pq-card-' + btn.getAttribute('data-jump')).scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    listEl.innerHTML = ORDER.map(function(key) {
+      const info = window.SCHOOL_INFO[key];
+      const categories = info.itin.map(function(cat) {
+        return '<div class="pq-category">' + escapeHtml(cat.day) + '</div>' + renderStops(cat.stops);
+      }).join('');
+      return '<div class="pq-card" id="pq-card-' + key + '">' +
+        '<div class="pq-card-head">' +
+          '<div class="pq-card-title">' + escapeHtml(info.name) + '</div>' +
+          '<a class="pq-link-btn" href="' + escapeHtml(info.link) + '" target="_blank" rel="noopener">Official page \u2197</a>' +
+        '</div>' +
+        categories +
+      '</div>';
+    }).join('');
+  }
+
+  render();
+})();
+</script>
+
+<script>
+(function() {
+  const STORAGE_KEY = 'checklist:household-todos';
+  const phasesEl = document.getElementById('hh-phases');
+  const pctEl = document.getElementById('hh-pct');
+  const barEl = document.getElementById('hh-bar');
+
+  const SEED_PHASES = [];
+
+  let phases = [];
+  const openPhases = {};
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  async function load() {
+    try {
+      const res = await window.storage.get(STORAGE_KEY, true);
+      phases = res && res.value ? JSON.parse(res.value) : SEED_PHASES;
+    } catch (e) {
+      phases = SEED_PHASES;
+    }
+    render();
+  }
+
+  async function save() {
+    try {
+      const result = await window.storage.set(STORAGE_KEY, JSON.stringify(phases), true);
+      if (!result) throw new Error('Storage set returned no result');
+      if (window.hubToast) window.hubToast('Saved', {});
+    } catch (e) {
+      console.error('save failed', e);
+      if (window.hubToast) window.hubToast("Couldn't save your last change — " + (e.message || 'unknown error'), { error: true, retry: save });
+    }
+  }
+
+  function allItems() {
+    return phases.reduce((acc, p) => acc.concat(p.items), []);
+  }
+
+  function updateProgress() {
+    const items = allItems();
+    const total = items.length;
+    const done = items.filter(i => i.done).length;
+    const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+    pctEl.textContent = pct + '%';
+    barEl.style.width = pct + '%';
+  }
+
+  function render() {
+    updateProgress();
+    phasesEl.innerHTML = '';
+
+    phases.forEach(function(phase, idx) {
+      const total = phase.items.length;
+      const done = phase.items.filter(i => i.done).length;
+      const isOpen = !!openPhases[phase.id];
+
+      const wrap = document.createElement('div');
+      wrap.className = 'pt-phase';
+
+      const head = document.createElement('div');
+      head.className = 'pt-phase-head';
+      head.innerHTML =
+        '<div class="pt-phase-title">' +
+          '<span class="pt-phase-num">' + (idx + 1) + '</span>' +
+          '<span class="pt-phase-name">' + escapeHtml(phase.name) + '</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;">' +
+          '<span class="pt-phase-count' + (total > 0 && done === total ? ' done' : '') + '">' + done + ' / ' + total + '</span>' +
+          '<span class="pt-phase-chevron' + (isOpen ? ' open' : '') + '">\u203A</span>' +
+        '</div>';
+      head.addEventListener('click', function() {
+        openPhases[phase.id] = !openPhases[phase.id];
+        render();
+      });
+      wrap.appendChild(head);
+
+      const body = document.createElement('div');
+      body.className = 'pt-phase-body' + (isOpen ? ' open' : '');
+
+      const itemsWrap = document.createElement('div');
+      itemsWrap.className = 'pt-items';
+
+      phase.items.forEach(function(item) {
+        const row = document.createElement('div');
+        row.className = 'pt-item';
+        row.innerHTML =
+          '<input type="checkbox" ' + (item.done ? 'checked' : '') + ' data-toggle="' + item.id + '">' +
+          '<div class="pt-item-text">' +
+            '<span class="pt-item-label' + (item.done ? ' done' : '') + '" data-toggle="' + item.id + '">' + escapeHtml(item.label) + '</span>' +
+          '</div>' +
+          '<button class="pt-item-del" data-del="' + item.id + '" title="Remove">\u2715</button>';
+        itemsWrap.appendChild(row);
+      });
+
+      const addRow = document.createElement('div');
+      addRow.className = 'pt-add-row';
+      addRow.innerHTML =
+        '<input type="text" placeholder="Add a task to this category..." data-addinput="' + phase.id + '">' +
+        '<button data-addbtn="' + phase.id + '">+ Add</button>';
+      itemsWrap.appendChild(addRow);
+
+      body.appendChild(itemsWrap);
+      wrap.appendChild(body);
+      phasesEl.appendChild(wrap);
+    });
+
+    phasesEl.querySelectorAll('[data-toggle]').forEach(function(el) {
+      el.addEventListener('click', async function(e) {
+        e.stopPropagation();
+        const id = el.getAttribute('data-toggle');
+        const item = allItems().find(function(i) { return i.id === id; });
+        if (item) {
+          item.done = !item.done;
+          await save();
+          render();
+        }
+      });
+    });
+
+    phasesEl.querySelectorAll('[data-del]').forEach(function(btn) {
+      btn.addEventListener('click', async function(e) {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-del');
+        phases.forEach(function(p) { p.items = p.items.filter(function(i) { return i.id !== id; }); });
+        await save();
+        render();
+      });
+    });
+
+    phasesEl.querySelectorAll('[data-addbtn]').forEach(function(btn) {
+      btn.addEventListener('click', async function(e) {
+        e.stopPropagation();
+        const phaseId = btn.getAttribute('data-addbtn');
+        const input = phasesEl.querySelector('[data-addinput="' + phaseId + '"]');
+        const label = input.value.trim();
+        if (!label) return;
+        const phase = phases.find(function(p) { return p.id === phaseId; });
+        phase.items.push({ id: 'item-' + Date.now(), label: label, done: false });
+        openPhases[phaseId] = true;
+        await save();
+        render();
+      });
+    });
+
+    phasesEl.querySelectorAll('[data-addinput]').forEach(function(input) {
+      input.addEventListener('click', function(e) { e.stopPropagation(); });
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const phaseId = input.getAttribute('data-addinput');
+          phasesEl.querySelector('[data-addbtn="' + phaseId + '"]').click();
+        }
+      });
+    });
+  }
+
+  window.addEventListener('hub:authenticated', load);
+})();
+</script>
+
+<script>
+(function() {
+  const STORAGE_KEY = 'listboard:travel-tracker';
+  const listEl = document.getElementById('trv-list');
+  const formSlot = document.getElementById('trv-form-slot');
+  const addToggle = document.getElementById('trv-add-toggle');
+
+  const SEED = [];
+
+  let trips = [];
+  let editingId = null;
+  let formOpen = false;
+  const openDayIndex = {};
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  function parseDate(s) {
+    const [y,m,d] = s.split('-').map(Number);
+    return new Date(y, m-1, d);
+  }
+
+  function fmtRange(start, end) {
+    const s = parseDate(start), e = parseDate(end);
+    const opts1 = { month: 'short', day: 'numeric' };
+    if (s.getTime() === e.getTime()) {
+      let str = s.toLocaleDateString('en-US', opts1);
+      if (s.getFullYear() !== today.getFullYear()) str += ', ' + s.getFullYear();
+      return str.toUpperCase();
+    }
+    const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
+    const opts2 = sameMonth ? { day: 'numeric' } : { month: 'short', day: 'numeric' };
+    let str = s.toLocaleDateString('en-US', opts1) + '\u2013' + e.toLocaleDateString('en-US', opts2);
+    if (s.getFullYear() !== today.getFullYear() || e.getFullYear() !== today.getFullYear()) {
+      str += ', ' + e.getFullYear();
+    }
+    return str.toUpperCase();
+  }
+
+  function daysUntil(start, end) {
+    const s = parseDate(start), e = parseDate(end);
+    const msPerDay = 86400000;
+    if (today > e) return { n: Math.round((today - e) / msPerDay), state: 'past' };
+    if (today >= s && today <= e) return { n: 0, state: 'now' };
+    return { n: Math.round((s - today) / msPerDay), state: 'future' };
+  }
+
+  async function load() {
+    try {
+      const res = await window.storage.get(STORAGE_KEY, true);
+      trips = res && res.value ? JSON.parse(res.value) : SEED;
+    } catch (e) {
+      trips = SEED;
+    }
+    render();
+  }
+
+  async function save() {
+    try {
+      const result = await window.storage.set(STORAGE_KEY, JSON.stringify(trips), true);
+      if (!result) throw new Error('Storage set returned no result');
+      if (window.hubToast) window.hubToast('Saved', {});
+    } catch (e) {
+      console.error('save failed', e);
+      if (window.hubToast) window.hubToast("Couldn't save your last change — " + (e.message || 'unknown error'), { error: true, retry: save });
+    }
+  }
+
+  function sortTrips(list) {
+    return [...list].sort((a, b) => {
+      const da = daysUntil(a.start, a.end), db = daysUntil(b.start, b.end);
+      const rank = { now: 0, future: 1, past: 2 };
+      if (rank[da.state] !== rank[db.state]) return rank[da.state] - rank[db.state];
+      if (da.state === 'past') return da.n - db.n;
+      return parseDate(a.start) - parseDate(b.start);
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function buildRow(trip) {
+    const d = daysUntil(trip.start, trip.end);
+    const row = document.createElement('div');
+    row.className = 'tb-row';
+
+    let dayLabel, dayUnit;
+    if (d.state === 'now') { dayLabel = 'NOW'; dayUnit = 'traveling'; }
+    else if (d.state === 'past') { dayLabel = d.n; dayUnit = 'days ago'; }
+    else { dayLabel = d.n; dayUnit = d.n === 1 ? 'day out' : 'days out'; }
+
+    const STATUS_LABELS = { researching: 'Researching', planning: 'Planning', confirmed: 'Confirmed', break: 'School break' };
+    const statusLabel = STATUS_LABELS[trip.status] || (trip.status.charAt(0).toUpperCase() + trip.status.slice(1));
+
+    row.innerHTML =
+      '<div class="tb-row-top">' +
+        '<div class="tb-days ' + (d.state === 'past' ? 'past' : '') + '">' + dayLabel + '<span class="tb-days-unit">' + dayUnit + '</span></div>' +
+        '<div class="tb-main">' +
+          '<div class="tb-dest">' + escapeHtml(trip.destination) + '</div>' +
+          '<div class="tb-meta">' +
+            '<span class="tb-dates">' + fmtRange(trip.start, trip.end) + '</span>' +
+            (trip.approx ? '<span class="tb-approx">est.</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="tb-status ' + trip.status + '">' + statusLabel + '</div>' +
+      '</div>' +
+      '<div class="tb-detail" id="trv-detail-' + trip.id + '">' +
+        '<div class="tb-detail-inner">' +
+          (trip.notes ? escapeHtml(trip.notes) : '<em style="color:var(--sage-dim)">No notes yet.</em>') +
+          '<div class="tb-detail-actions">' +
+            '<button class="tb-link-btn edit" data-edit="' + trip.id + '">Edit</button>' +
+            '<button class="tb-link-btn del" data-del="' + trip.id + '">Remove</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    row.querySelector('.tb-row-top').addEventListener('click', () => {
+      const detail = row.querySelector('.tb-detail');
+      const isOpen = detail.classList.contains('open');
+      listEl.querySelectorAll('.tb-detail.open').forEach(el => el.classList.remove('open'));
+      if (!isOpen) detail.classList.add('open');
+    });
+
+    return row;
+  }
+
+  function monthKey(dateStr) {
+    const d = parseDate(dateStr);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+
+  function monthLabel(dateStr) {
+    return parseDate(dateStr).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
+  }
+
+  function groupByMonth(list) {
+    const map = {};
+    list.forEach(t => {
+      const k = monthKey(t.start);
+      (map[k] = map[k] || []).push(t);
+    });
+    return map;
+  }
+
+  function render() {
+    const sorted = sortTrips(trips);
+    if (sorted.length === 0) {
+      listEl.innerHTML = '<div class="tb-empty">Nothing here yet.<br>Add a trip to start tracking it.</div>';
+      return;
+    }
+    listEl.innerHTML = '';
+
+    const tripList = sorted.filter(t => t.status !== 'break');
+    const breakList = sorted.filter(t => t.status === 'break');
+    const tripsByMonth = groupByMonth(tripList);
+    const breaksByMonth = groupByMonth(breakList);
+    const monthKeys = Array.from(new Set([...Object.keys(tripsByMonth), ...Object.keys(breaksByMonth)])).sort();
+
+    const grid = document.createElement('div');
+    grid.className = 'tb-columns';
+
+    const headL = document.createElement('div');
+    headL.className = 'tb-column-title';
+    headL.textContent = 'TRIPS';
+    const headR = document.createElement('div');
+    headR.className = 'tb-column-title';
+    headR.textContent = "MIKA'S SCHOOL BREAKS";
+    grid.appendChild(headL);
+    grid.appendChild(headR);
+
+    monthKeys.forEach(key => {
+      const monthTrips = tripsByMonth[key] || [];
+      const monthBreaks = breaksByMonth[key] || [];
+      const sample = (monthTrips[0] || monthBreaks[0]);
+
+      const label = document.createElement('div');
+      label.className = 'tb-month-label';
+      label.textContent = monthLabel(sample.start);
+      grid.appendChild(label);
+
+      const colL = document.createElement('div');
+      colL.className = 'tb-month-col';
+      if (monthTrips.length === 0) {
+        const ph = document.createElement('div');
+        ph.className = 'tb-month-placeholder';
+        ph.textContent = '\u2014';
+        colL.appendChild(ph);
+      } else {
+        monthTrips.forEach(t => colL.appendChild(buildRow(t)));
+      }
+
+      const colR = document.createElement('div');
+      colR.className = 'tb-month-col';
+      if (monthBreaks.length === 0) {
+        const ph = document.createElement('div');
+        ph.className = 'tb-month-placeholder';
+        ph.textContent = '\u2014';
+        colR.appendChild(ph);
+      } else {
+        monthBreaks.forEach(t => colR.appendChild(buildRow(t)));
+      }
+
+      grid.appendChild(colL);
+      grid.appendChild(colR);
+    });
+
+    listEl.appendChild(grid);
+
+    listEl.querySelectorAll('[data-edit]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openForm(btn.getAttribute('data-edit'));
+      });
+    });
+    listEl.querySelectorAll('[data-del]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-del');
+        trips = trips.filter(t => t.id !== id);
+        await save();
+        render();
+      });
+    });
+  }
+
+  function openForm(id) {
+    editingId = id || null;
+    const trip = id ? trips.find(t => t.id === id) : null;
+    formOpen = true;
+    addToggle.textContent = 'Cancel';
+
+    formSlot.innerHTML =
+      '<div class="tb-form">' +
+        '<div class="tb-form-grid">' +
+          '<div class="tb-field full"><label>Title</label>' +
+          '<input type="text" id="trv-f-dest" value="' + (trip ? escapeHtml(trip.destination) : '') + '" placeholder="e.g. Kyoto + Osaka"></div>' +
+          '<div class="tb-field"><label>Start date</label>' +
+          '<input type="date" id="trv-f-start" value="' + (trip ? trip.start : '') + '"></div>' +
+          '<div class="tb-field"><label>End date</label>' +
+          '<input type="date" id="trv-f-end" value="' + (trip ? trip.end : '') + '"></div>' +
+          '<div class="tb-field"><label>Status</label>' +
+          '<select id="trv-f-status">' +
+            '<option value="researching"' + (trip && trip.status === 'researching' ? ' selected' : '') + '>Researching</option>' +
+            '<option value="planning"' + (trip && trip.status === 'planning' ? ' selected' : '') + '>Planning</option>' +
+            '<option value="confirmed"' + (!trip || trip.status === 'confirmed' ? ' selected' : '') + '>Confirmed</option>' +
+            '<option value="break"' + (trip && trip.status === 'break' ? ' selected' : '') + '>School break</option>' +
+          '</select></div>' +
+          '<div class="tb-field"><div class="tb-checkbox-row" style="margin-top:22px;">' +
+            '<input type="checkbox" id="trv-f-approx"' + (trip && trip.approx ? ' checked' : '') + '>' +
+            '<label for="trv-f-approx">Dates are estimated</label></div></div>' +
+          '<div class="tb-field full"><label>Notes</label>' +
+          '<textarea id="trv-f-notes" placeholder="Hotel, key plans, links...">' + (trip ? escapeHtml(trip.notes || '') : '') + '</textarea></div>' +
+        '</div>' +
+        '<div class="tb-form-actions">' +
+          '<button class="tb-btn secondary" id="trv-f-cancel">Cancel</button>' +
+          '<button class="tb-btn primary" id="trv-f-save">' + (trip ? 'Save changes' : 'Add trip') + '</button>' +
+        '</div>' +
+      '</div>';
+
+    document.getElementById('trv-f-cancel').addEventListener('click', closeForm);
+    document.getElementById('trv-f-save').addEventListener('click', submitForm);
+  }
+
+  function closeForm() {
+    formOpen = false;
+    editingId = null;
+    addToggle.textContent = '+ Add trip';
+    formSlot.innerHTML = '';
+  }
+
+  async function submitForm() {
+    const dest = document.getElementById('trv-f-dest').value.trim();
+    const start = document.getElementById('trv-f-start').value;
+    const end = document.getElementById('trv-f-end').value || start;
+    const status = document.getElementById('trv-f-status').value;
+    const approx = document.getElementById('trv-f-approx').checked;
+    const notes = document.getElementById('trv-f-notes').value.trim();
+
+    if (!dest || !start) return;
+
+    if (editingId) {
+      const t = trips.find(t => t.id === editingId);
+      Object.assign(t, { destination: dest, start, end, status, approx, notes });
+    } else {
+      trips.push({
+        id: 'trip-' + Date.now(),
+        destination: dest, start, end, status, approx, notes,
+        itinerary: [], itinSource: ''
+      });
+    }
+    await save();
+    closeForm();
+    render();
+  }
+
+  addToggle.addEventListener('click', () => {
+    if (formOpen) { closeForm(); } else { openForm(null); }
+  });
+
+  window.addEventListener('hub:authenticated', load);
+})();
+</script>
+
+</body>
+</html>
