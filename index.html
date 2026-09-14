@@ -782,17 +782,13 @@
     </form>
     <a href="#" id="auth-forgot-link" class="auth-forgot-link">Forgot password?</a>
     <div id="auth-forgot-msg" class="auth-info-msg"></div>
-  </div>
-</div>
-
-<div id="reset-gate" class="auth-screen" style="display:none;">
-  <div class="auth-box">
-    <form id="reset-form">
-      <div class="auth-title">SET A NEW PASSWORD</div>
-      <label for="reset-password">NEW PASSWORD</label>
-      <input id="reset-password" type="password" autocomplete="new-password" required minlength="6">
-      <button type="submit">Update password</button>
-      <div id="reset-error" class="auth-error-msg"></div>
+    <form id="forgot-form" style="display:none;margin-top:14px;">
+      <label for="forgot-code">CODE FROM EMAIL</label>
+      <input id="forgot-code" type="text" inputmode="numeric" autocomplete="one-time-code" required>
+      <label for="forgot-newpass">NEW PASSWORD</label>
+      <input id="forgot-newpass" type="password" autocomplete="new-password" required minlength="6">
+      <button type="submit">Reset password</button>
+      <div id="forgot-error" class="auth-error-msg"></div>
     </form>
   </div>
 </div>
@@ -936,20 +932,18 @@
   window.sb = sb; // shared client for the settings board below
 
   var gate = document.getElementById('auth-gate');
-  var resetGate = document.getElementById('reset-gate');
   var hubRoot = document.getElementById('hub-root');
   var form = document.getElementById('auth-form');
   var errorEl = document.getElementById('auth-error');
   var signoutBtn = document.getElementById('auth-signout-btn');
   var forgotLink = document.getElementById('auth-forgot-link');
   var forgotMsg = document.getElementById('auth-forgot-msg');
-  var resetForm = document.getElementById('reset-form');
-  var resetError = document.getElementById('reset-error');
+  var forgotForm = document.getElementById('forgot-form');
+  var forgotError = document.getElementById('forgot-error');
   var authFired = false;
 
   function showApp() {
     gate.style.display = 'none';
-    resetGate.style.display = 'none';
     hubRoot.style.display = '';
     if (!authFired) {
       authFired = true;
@@ -959,14 +953,7 @@
 
   function showGate() {
     hubRoot.style.display = 'none';
-    resetGate.style.display = 'none';
     gate.style.display = 'flex';
-  }
-
-  function showResetGate() {
-    gate.style.display = 'none';
-    hubRoot.style.display = 'none';
-    resetGate.style.display = 'flex';
   }
 
   form.addEventListener('submit', async function(e) {
@@ -983,6 +970,10 @@
 
   signoutBtn.addEventListener('click', function() { sb.auth.signOut(); });
 
+  // Reset-by-code instead of a clickable link: mail scanners (Gmail's
+  // included) silently pre-fetch links to check for phishing, which burns
+  // a one-time recovery link before the user ever clicks it. A code the
+  // user has to type in by hand can't be consumed by a bot.
   forgotLink.addEventListener('click', async function(e) {
     e.preventDefault();
     forgotMsg.style.display = 'none';
@@ -992,53 +983,39 @@
       forgotMsg.style.display = 'block';
       return;
     }
-    var redirectTo = window.location.origin + window.location.pathname;
-    var res = await sb.auth.resetPasswordForEmail(email, { redirectTo: redirectTo });
-    forgotMsg.textContent = res.error ? res.error.message : 'Check your email for a reset link.';
-    forgotMsg.style.display = 'block';
-  });
-
-  resetForm.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    resetError.style.display = 'none';
-    var newPassword = document.getElementById('reset-password').value;
-    var res = await sb.auth.updateUser({ password: newPassword });
+    var res = await sb.auth.resetPasswordForEmail(email);
     if (res.error) {
-      resetError.textContent = res.error.message;
-      resetError.style.display = 'block';
+      forgotMsg.textContent = res.error.message;
+      forgotMsg.style.display = 'block';
       return;
     }
-    pendingRecovery = false;
+    forgotMsg.textContent = 'Enter the code from your email below.';
+    forgotMsg.style.display = 'block';
+    forgotForm.style.display = 'block';
+  });
+
+  forgotForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    forgotError.style.display = 'none';
+    var email = document.getElementById('auth-email').value.trim();
+    var code = document.getElementById('forgot-code').value.trim();
+    var newPassword = document.getElementById('forgot-newpass').value;
+    var verifyRes = await sb.auth.verifyOtp({ email: email, token: code, type: 'recovery' });
+    if (verifyRes.error) {
+      forgotError.textContent = verifyRes.error.message;
+      forgotError.style.display = 'block';
+      return;
+    }
+    var updateRes = await sb.auth.updateUser({ password: newPassword });
+    if (updateRes.error) {
+      forgotError.textContent = updateRes.error.message;
+      forgotError.style.display = 'block';
+      return;
+    }
     showApp();
   });
 
-  // Supabase's automatic detectSessionInUrl didn't reliably pick up the
-  // recovery hash on this page, so parse it ourselves as a fallback and
-  // set the session explicitly. pendingRecovery keeps the reset screen up
-  // even once setSession() below triggers its own SIGNED_IN-style event,
-  // which would otherwise race past it into the logged-in view.
-  var pendingRecovery = false;
-  (function handleRecoveryHash() {
-    var hash = window.location.hash;
-    if (!hash || hash.indexOf('type=recovery') === -1) return;
-    var params = new URLSearchParams(hash.substring(1));
-    var access_token = params.get('access_token');
-    var refresh_token = params.get('refresh_token');
-    if (!access_token || !refresh_token) return;
-    pendingRecovery = true;
-    sb.auth.setSession({ access_token: access_token, refresh_token: refresh_token }).then(function(res) {
-      history.replaceState(null, '', window.location.pathname + window.location.search);
-      if (!res.error) showResetGate();
-    });
-  })();
-
-  // onAuthStateChange alone covers both the initial load (it fires once
-  // immediately with the current session) and later changes, so a separate
-  // getSession() call here would race with it — e.g. a recovery link
-  // establishes a session, and that second call was winning the race and
-  // sending the user straight into the app instead of the reset screen.
   sb.auth.onAuthStateChange(function(event, session) {
-    if (event === 'PASSWORD_RECOVERY' || pendingRecovery) { showResetGate(); return; }
     if (session) showApp(); else showGate();
   });
 
