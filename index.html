@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  body { margin: 0; background: #0c1210; }
+  body { margin: 0; background: #0c1210; overflow-x: hidden; }
   .auth-screen {
     min-height: 100vh;
     display: flex;
@@ -215,7 +215,12 @@
     gap: 22px;
     border-bottom: 1px solid var(--line);
     margin-bottom: 20px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .hub-tabs::-webkit-scrollbar { display: none; }
+  .hub-tab { flex-shrink: 0; }
   .hub-tab {
     background: none;
     border: none;
@@ -240,7 +245,12 @@
     padding-bottom: 10px;
     margin-bottom: 18px;
     border-bottom: 1px dashed var(--line);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .hub-subtabs::-webkit-scrollbar { display: none; }
+  .hub-subtab { flex-shrink: 0; }
   .hub-subtab {
     background: none;
     border: none;
