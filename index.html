@@ -931,6 +931,14 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 (function() {
+  // Bumped by hand on every deploy so a diagnostic log entry (or the
+  // console) can show definitively which build a device is actually
+  // running — GitHub Pages caches this file for ~10 minutes, so "I
+  // reloaded and it's still broken" doesn't by itself prove the device
+  // has the latest fix.
+  var APP_VERSION = '2026-09-15-signout-fix';
+  console.log('[family-hub] build', APP_VERSION);
+
   // TODO: replace with your Supabase project's URL and anon public key
   // (Settings -> API in the Supabase dashboard). The anon key is safe to
   // ship client-side — it's useless without a logged-in session, because
@@ -1052,6 +1060,7 @@
       sb.from('diagnostics').insert({
         event: event,
         detail: Object.assign({
+          appVersion: APP_VERSION,
           userAgent: navigator.userAgent,
           online: navigator.onLine,
           visibility: document.visibilityState,
