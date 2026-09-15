@@ -936,7 +936,7 @@
   // running — GitHub Pages caches this file for ~10 minutes, so "I
   // reloaded and it's still broken" doesn't by itself prove the device
   // has the latest fix.
-  var APP_VERSION = '2026-09-15-bfcache-fix';
+  var APP_VERSION = '2026-09-15-full-diagnostics';
   console.log('[family-hub] build', APP_VERSION);
 
   // Reopening a closed tab (or a browser restoring its last session)
@@ -1081,6 +1081,19 @@
       }).then(function() {}, function() {});
     } catch (e) {}
   }
+  window.logDiagnostic = logDiagnostic; // shared with each board below, so a successful (not just failed) load can be logged too
+
+  // A render()-time crash (a real board fetch succeeding but a bug in
+  // turning that data into DOM throwing partway through) would otherwise
+  // be completely invisible — nothing catches it, nothing shows on
+  // screen, and it would look identical to a silent fetch failure. Catch
+  // it here so it shows up in the same place as everything else.
+  window.addEventListener('error', function(e) {
+    logDiagnostic('js_error', { message: e.message, filename: e.filename, lineno: e.lineno, colno: e.colno, stack: e.error && e.error.stack });
+  });
+  window.addEventListener('unhandledrejection', function(e) {
+    logDiagnostic('unhandled_rejection', { message: e.reason && e.reason.message, stack: e.reason && e.reason.stack });
+  });
 
   // A hung request (no error, no response) would otherwise leave a board
   // stuck blank forever with nothing to catch. Race it against a timeout
@@ -1458,6 +1471,7 @@
       trips = SEED;
       if (window.hubToast) window.hubToast("Couldn't load — " + (e && e.message || 'unknown error'), { error: true });
     }
+    if (window.logDiagnostic) window.logDiagnostic('board_loaded', { key: STORAGE_KEY, count: trips.length });
     render();
   }
 
@@ -1831,6 +1845,7 @@
     if (openPhases[phases[0] && phases[0].id] === undefined && phases.length) {
       // leave all collapsed by default except none forced open
     }
+    if (window.logDiagnostic) window.logDiagnostic('board_loaded', { key: STORAGE_KEY, count: phases.reduce(function(n,p){ return n+p.items.length; }, 0) });
     render();
   }
 
@@ -2056,6 +2071,7 @@
       phases = SEED_PHASES;
       if (window.hubToast) window.hubToast("Couldn't load — " + (e && e.message || 'unknown error'), { error: true });
     }
+    if (window.logDiagnostic) window.logDiagnostic('board_loaded', { key: STORAGE_KEY, count: phases.reduce(function(n,p){ return n+p.items.length; }, 0) });
     render();
   }
 
@@ -2318,6 +2334,7 @@
       trips = SEED;
       if (window.hubToast) window.hubToast("Couldn't load — " + (e && e.message || 'unknown error'), { error: true });
     }
+    if (window.logDiagnostic) window.logDiagnostic('board_loaded', { key: STORAGE_KEY, count: trips.length });
     render();
   }
 
