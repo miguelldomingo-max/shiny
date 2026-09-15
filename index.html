@@ -936,7 +936,7 @@
   // running — GitHub Pages caches this file for ~10 minutes, so "I
   // reloaded and it's still broken" doesn't by itself prove the device
   // has the latest fix.
-  var APP_VERSION = '2026-09-15-loop-guard';
+  var APP_VERSION = '2026-09-15-race-fix';
   console.log('[family-hub] build', APP_VERSION);
 
   // Reopening a closed tab (or a browser restoring its last session)
@@ -990,6 +990,16 @@
     hubRoot.style.display = '';
     if (!authFired) {
       authFired = true;
+      // If auth resolves quickly (an already-valid cached session needs
+      // no network round-trip) while the rest of this file is still
+      // being downloaded/parsed on a slow or just-reconnected
+      // connection, this event can fire before a board's own <script>
+      // block has even run — meaning its addEventListener call hasn't
+      // happened yet, and the event is lost with no one to catch it.
+      // window.__hubAuthenticated lets each board check "did this
+      // already happen?" at registration time, not just listen for a
+      // live event that might arrive too early.
+      window.__hubAuthenticated = true;
       logDiagnostic('hub_authenticated');
       window.dispatchEvent(new Event('hub:authenticated'));
     }
@@ -1839,6 +1849,7 @@
 
   window.addEventListener('hub:authenticated', load);
   window.addEventListener('hub:visible', load);
+  if (window.__hubAuthenticated) load();
 })();
 </script>
 
@@ -2015,6 +2026,7 @@
 
   window.addEventListener('hub:authenticated', load);
   window.addEventListener('hub:visible', load);
+  if (window.__hubAuthenticated) load();
 })();
 </script>
 
@@ -2304,6 +2316,7 @@
 
   window.addEventListener('hub:authenticated', load);
   window.addEventListener('hub:visible', load);
+  if (window.__hubAuthenticated) load();
 })();
 </script>
 
@@ -2752,6 +2765,7 @@
 
   window.addEventListener('hub:authenticated', load);
   window.addEventListener('hub:visible', load);
+  if (window.__hubAuthenticated) load();
 })();
 </script>
 
@@ -2817,6 +2831,7 @@
 
   window.addEventListener('hub:authenticated', load);
   window.addEventListener('hub:visible', load);
+  if (window.__hubAuthenticated) load();
 })();
 </script>
 
