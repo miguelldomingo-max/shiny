@@ -936,7 +936,7 @@
   // running — GitHub Pages caches this file for ~10 minutes, so "I
   // reloaded and it's still broken" doesn't by itself prove the device
   // has the latest fix.
-  var APP_VERSION = '2026-09-15-full-diagnostics';
+  var APP_VERSION = '2026-09-15-session-validate';
   console.log('[family-hub] build', APP_VERSION);
 
   // Reopening a closed tab (or a browser restoring its last session)
@@ -1209,7 +1209,24 @@
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible' && hubRoot.style.display !== 'none') {
       logDiagnostic('hub_visible');
-      window.dispatchEvent(new Event('hub:visible'));
+      // Supabase's own background token-refresh timer is throttled or
+      // frozen while the tab is hidden, same as any other JS timer. If
+      // the refresh token it eventually tries is already stale by the
+      // time it runs (e.g. a different tab/session already rotated it),
+      // that refresh fails with a 400 the app never sees — the SDK can
+      // be left holding a session object that looks present but is
+      // actually unusable, with every board fetch failing quietly from
+      // then on. Explicitly verify the session is still good whenever
+      // the tab comes back, and force a clean sign-out if it isn't,
+      // rather than trusting stale in-memory state.
+      sb.auth.getSession().then(function(res) {
+        if (res.error || !res.data.session) {
+          logDiagnostic('session_invalid_on_visible', { error: res.error && res.error.message });
+          sb.auth.signOut();
+          return;
+        }
+        window.dispatchEvent(new Event('hub:visible'));
+      });
     }
   });
 })();
