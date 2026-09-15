@@ -144,7 +144,7 @@ async function callTool(name: string, args: Record<string, unknown>) {
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Headers": "authorization, content-type, mcp-protocol-version, mcp-session-id, accept",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -203,10 +203,16 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (method === "initialize") {
+      // Echo back whatever protocol version the client asked for rather than
+      // pinning one: a client that only speaks a newer revision will refuse
+      // to connect if we answer with an older one. This server's surface is
+      // just tools/list + tools/call, which is unchanged across revisions.
+      const requested = params?.protocolVersion;
+      const protocolVersion = typeof requested === "string" && requested ? requested : "2025-06-18";
       return new Response(
         JSON.stringify(
           jsonRpcResult(id, {
-            protocolVersion: "2024-11-05",
+            protocolVersion,
             capabilities: { tools: {} },
             serverInfo: { name: "family-hub", version: "1.0.0" },
           }),
