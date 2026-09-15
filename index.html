@@ -1055,39 +1055,75 @@
     });
   }
 
+  function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+  // A mobile browser backgrounding the tab can suspend its network stack;
+  // the first fetch after coming back to the foreground sometimes loses
+  // that race before the connection is fully back, even though a session
+  // refresh a second later would succeed fine. One quick retry absorbs
+  // that class of transient failure instead of leaving a board stuck
+  // empty until the user notices and manually reloads.
+  async function withRetry(fn) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (isAuthError(e)) throw e;
+      await sleep(1200);
+      return await fn();
+    }
+  }
+
   // Shim matching the interface every board already calls
   // (window.storage.get/set) so none of the board scripts below need
   // to change — only their trailing `load();` becomes an event listener.
   window.storage = {
     get: async function(key) {
-      var res;
-      try {
-        res = await withTimeout(sb.from('hub_data').select('value').eq('key', key).maybeSingle(), 10000);
-      } catch (e) {
-        sb.auth.signOut();
-        throw e;
-      }
-      if (res.error) {
-        if (isAuthError(res.error)) sb.auth.signOut();
-        throw res.error;
-      }
-      return res.data ? { value: JSON.stringify(res.data.value) } : null;
+      return withRetry(async function() {
+        var res;
+        try {
+          res = await withTimeout(sb.from('hub_data').select('value').eq('key', key).maybeSingle(), 10000);
+        } catch (e) {
+          sb.auth.signOut();
+          throw e;
+        }
+        if (res.error) {
+          if (isAuthError(res.error)) sb.auth.signOut();
+          throw res.error;
+        }
+        return res.data ? { value: JSON.stringify(res.data.value) } : null;
+      });
     },
     set: async function(key, value) {
-      var res;
-      try {
-        res = await withTimeout(sb.from('hub_data').upsert({ key: key, value: JSON.parse(value), updated_at: new Date().toISOString() }), 10000);
-      } catch (e) {
-        sb.auth.signOut();
-        throw e;
-      }
-      if (res.error) {
-        if (isAuthError(res.error)) sb.auth.signOut();
-        throw res.error;
-      }
-      return true;
+      return withRetry(async function() {
+        var res;
+        try {
+          res = await withTimeout(sb.from('hub_data').upsert({ key: key, value: JSON.parse(value), updated_at: new Date().toISOString() }), 10000);
+        } catch (e) {
+          sb.auth.signOut();
+          throw e;
+        }
+        if (res.error) {
+          if (isAuthError(res.error)) sb.auth.signOut();
+          throw res.error;
+        }
+        return true;
+      });
     }
   };
+
+  // Mobile Safari (and others) suspend a backgrounded tab's timers and
+  // network, and can silently discard/reload the page's memory while it's
+  // away. Boards only ever load once, right after login — nothing tells
+  // them to check for fresh data when the tab comes back to the
+  // foreground, so a fetch that raced the phone's network reconnecting
+  // could fail once on the way out and just stay empty forever. Reload
+  // every board whenever the tab becomes visible again, self-healing that
+  // case and picking up any changes made elsewhere while it was away.
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible' && hubRoot.style.display !== 'none') {
+      window.dispatchEvent(new Event('hub:visible'));
+    }
+  });
 })();
 </script>
 
@@ -1683,6 +1719,7 @@
   });
 
   window.addEventListener('hub:authenticated', load);
+  window.addEventListener('hub:visible', load);
 })();
 </script>
 
@@ -1857,6 +1894,7 @@
   }
 
   window.addEventListener('hub:authenticated', load);
+  window.addEventListener('hub:visible', load);
 })();
 </script>
 
@@ -2144,6 +2182,7 @@
   }
 
   window.addEventListener('hub:authenticated', load);
+  window.addEventListener('hub:visible', load);
 })();
 </script>
 
@@ -2590,6 +2629,7 @@
   });
 
   window.addEventListener('hub:authenticated', load);
+  window.addEventListener('hub:visible', load);
 })();
 </script>
 
@@ -2654,6 +2694,7 @@
   });
 
   window.addEventListener('hub:authenticated', load);
+  window.addEventListener('hub:visible', load);
 })();
 </script>
 
