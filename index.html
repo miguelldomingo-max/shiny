@@ -936,8 +936,20 @@
   // running — GitHub Pages caches this file for ~10 minutes, so "I
   // reloaded and it's still broken" doesn't by itself prove the device
   // has the latest fix.
-  var APP_VERSION = '2026-09-15-signout-fix';
+  var APP_VERSION = '2026-09-15-bfcache-fix';
   console.log('[family-hub] build', APP_VERSION);
+
+  // Reopening a closed tab (or a browser restoring its last session)
+  // doesn't re-fetch the page — it restores the exact page/script state
+  // it had from the browser's back-forward cache, frozen at whatever
+  // moment it was closed, with no chance for any of this file's code to
+  // run again. `pageshow` with `event.persisted` is the standard signal
+  // for that restoration; force a real reload when it happens so the
+  // page always ends up running fresh code against a fresh session
+  // instead of a stale snapshot.
+  window.addEventListener('pageshow', function(event) {
+    if (event.persisted) location.reload();
+  });
 
   // TODO: replace with your Supabase project's URL and anon public key
   // (Settings -> API in the Supabase dashboard). The anon key is safe to
