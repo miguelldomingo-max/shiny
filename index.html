@@ -936,7 +936,7 @@
   // running — GitHub Pages caches this file for ~10 minutes, so "I
   // reloaded and it's still broken" doesn't by itself prove the device
   // has the latest fix.
-  var APP_VERSION = '2026-09-15-session-validate';
+  var APP_VERSION = '2026-09-15-loop-guard';
   console.log('[family-hub] build', APP_VERSION);
 
   // Reopening a closed tab (or a browser restoring its last session)
@@ -947,8 +947,21 @@
   // for that restoration; force a real reload when it happens so the
   // page always ends up running fresh code against a fresh session
   // instead of a stale snapshot.
+  //
+  // Guarded with a one-shot sessionStorage flag: if a browser ever
+  // reports the *reloaded* page itself as persisted too (observed as
+  // repeated hub_authenticated log entries seconds apart, with no board
+  // ever finishing a load in between), location.reload() would otherwise
+  // fire again immediately, forever — a self-inflicted loop that never
+  // lets the page finish loading, which looks identical to "still
+  // blank." sessionStorage survives a reload but not a real new tab, so
+  // this allows exactly one forced reload per tab lifetime.
   window.addEventListener('pageshow', function(event) {
-    if (event.persisted) location.reload();
+    if (!event.persisted) return;
+    var guardKey = 'hub_bfcache_reload_done';
+    if (sessionStorage.getItem(guardKey)) return;
+    try { sessionStorage.setItem(guardKey, '1'); } catch (e) {}
+    location.reload();
   });
 
   // TODO: replace with your Supabase project's URL and anon public key
