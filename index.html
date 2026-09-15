@@ -957,6 +957,7 @@
     hubRoot.style.display = '';
     if (!authFired) {
       authFired = true;
+      logDiagnostic('hub_authenticated');
       window.dispatchEvent(new Event('hub:authenticated'));
     }
   }
@@ -1042,6 +1043,24 @@
       code === 'PGRST301' || code === '401';
   }
 
+  // Best-effort diagnostic logging to the `diagnostics` table, so a real
+  // failure can be inspected later instead of relying on a description of
+  // what the screen looked like. Must never throw — a logging failure
+  // can't be allowed to mask or replace the original error.
+  function logDiagnostic(event, detail) {
+    try {
+      sb.from('diagnostics').insert({
+        event: event,
+        detail: Object.assign({
+          userAgent: navigator.userAgent,
+          online: navigator.onLine,
+          visibility: document.visibilityState,
+          url: location.href
+        }, detail || {})
+      }).then(function() {}, function() {});
+    } catch (e) {}
+  }
+
   // A hung request (no error, no response) would otherwise leave a board
   // stuck blank forever with nothing to catch. Race it against a timeout
   // so it always resolves one way or another within 10s, and treat a
@@ -1057,20 +1076,49 @@
 
   function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
+  // If the browser reports we're offline, wait (briefly) for an 'online'
+  // event rather than burning a retry attempt against a connection that
+  // isn't there yet — relevant right after a phone resumes from being
+  // backgrounded, when the network can take a moment to reconnect.
+  function waitForOnline(maxMs) {
+    if (navigator.onLine) return Promise.resolve();
+    return new Promise(function(resolve) {
+      var done = false;
+      function finish() { if (!done) { done = true; window.removeEventListener('online', finish); resolve(); } }
+      window.addEventListener('online', finish);
+      setTimeout(finish, maxMs);
+    });
+  }
+
   // A mobile browser backgrounding the tab can suspend its network stack;
-  // the first fetch after coming back to the foreground sometimes loses
-  // that race before the connection is fully back, even though a session
-  // refresh a second later would succeed fine. One quick retry absorbs
-  // that class of transient failure instead of leaving a board stuck
-  // empty until the user notices and manually reloads.
-  async function withRetry(fn) {
-    try {
-      return await fn();
-    } catch (e) {
-      if (isAuthError(e)) throw e;
-      await sleep(1200);
-      return await fn();
+  // the first fetch(es) after coming back to the foreground can lose that
+  // race before the connection is fully back. Retry a few times with
+  // backoff instead of just once, and log the final failure (with the
+  // real error) if every attempt fails, instead of leaving a board stuck
+  // empty with no trace of why.
+  async function withRetry(fn, label) {
+    var attempts = 0;
+    var lastErr;
+    while (attempts < 4) {
+      if (attempts > 0) {
+        await waitForOnline(3000);
+        await sleep(Math.min(1000 * Math.pow(2, attempts - 1), 6000));
+      }
+      try {
+        return await fn();
+      } catch (e) {
+        lastErr = e;
+        attempts++;
+        if (isAuthError(e)) break;
+      }
     }
+    logDiagnostic('storage_failed', {
+      label: label,
+      message: lastErr && lastErr.message,
+      code: lastErr && lastErr.code,
+      attempts: attempts
+    });
+    throw lastErr;
   }
 
   // Shim matching the interface every board already calls
@@ -1083,7 +1131,12 @@
         try {
           res = await withTimeout(sb.from('hub_data').select('value').eq('key', key).maybeSingle(), 10000);
         } catch (e) {
-          sb.auth.signOut();
+          // A plain network hiccup or timeout throws here too — it must
+          // NOT sign the user out, or a single transient blip destroys a
+          // perfectly good session before the retry above ever gets a
+          // chance to succeed on it. Only a genuine auth failure should
+          // end the session.
+          if (isAuthError(e)) sb.auth.signOut();
           throw e;
         }
         if (res.error) {
@@ -1091,7 +1144,7 @@
           throw res.error;
         }
         return res.data ? { value: JSON.stringify(res.data.value) } : null;
-      });
+      }, 'get:' + key);
     },
     set: async function(key, value) {
       return withRetry(async function() {
@@ -1099,7 +1152,7 @@
         try {
           res = await withTimeout(sb.from('hub_data').upsert({ key: key, value: JSON.parse(value), updated_at: new Date().toISOString() }), 10000);
         } catch (e) {
-          sb.auth.signOut();
+          if (isAuthError(e)) sb.auth.signOut();
           throw e;
         }
         if (res.error) {
@@ -1107,7 +1160,7 @@
           throw res.error;
         }
         return true;
-      });
+      }, 'set:' + key);
     }
   };
 
@@ -1121,6 +1174,7 @@
   // case and picking up any changes made elsewhere while it was away.
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible' && hubRoot.style.display !== 'none') {
+      logDiagnostic('hub_visible');
       window.dispatchEvent(new Event('hub:visible'));
     }
   });
