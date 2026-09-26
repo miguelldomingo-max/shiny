@@ -796,6 +796,18 @@
     padding: 5px 8px;
   }
 
+  .tb-maps {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--line);
+  }
+  .tb-map-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 3px 0;
+  }
+
   /* form */
   .tb-form {
     background: var(--panel);
@@ -2463,6 +2475,7 @@
   const openAddDay = {};      // tripId -> bool, whether the "+ Add day" form is expanded
   const openAddStop = {};     // dayKey (tripId::dayIdx) -> bool, whether "+ Add stop" form is expanded
   const openTodoAdd = {};     // stopKey -> bool, whether the "+ Add" to-do input is expanded
+  const openMapAdd = {};      // tripId -> bool, whether the "+ Add map" form is expanded
   let editingStop = null;     // stopKey currently being edited, or null
   let editingTodo = null;     // todoKey currently being edited, or null
 
@@ -2617,6 +2630,36 @@
     '</div>';
   }
 
+  function renderMaps(trip) {
+    const maps = trip.maps || [];
+    const addOpen = !!openMapAdd[trip.id];
+
+    const rows = maps.map((m, mi) => (
+      '<div class="tb-map-row">' +
+        '<a class="tb-link-btn hbh" href="' + escapeHtml(m.url) + '" target="_blank" rel="noopener">🗺️ ' + escapeHtml(m.label) + ' ↗</a>' +
+        '<button class="tb-link-btn del" data-map-del="' + trip.id + '::' + mi + '" title="Remove map">✕</button>' +
+      '</div>'
+    )).join('');
+
+    const addForm = !addOpen ? '' :
+      '<div class="tb-form" style="margin-top:8px;">' +
+        '<div class="tb-form-grid">' +
+          '<div class="tb-field"><label>LABEL</label><input type="text" data-newmap-label placeholder="e.g. Atlanta"></div>' +
+          '<div class="tb-field full"><label>MAP URL</label><input type="text" data-newmap-url placeholder="https://maps.google.com/..."></div>' +
+        '</div>' +
+        '<div class="tb-form-actions">' +
+          '<button class="tb-btn secondary" data-map-addcancel="' + trip.id + '">Cancel</button>' +
+          '<button class="tb-btn primary" data-add-map="' + trip.id + '">+ Add map</button>' +
+        '</div>' +
+      '</div>';
+
+    return '<div class="tb-maps">' +
+      rows +
+      (!addOpen ? '<div class="tb-hbh-toggle-row"><button class="tb-link-btn edit" data-map-addtoggle="' + trip.id + '">+ Add map</button></div>' : '') +
+      addForm +
+    '</div>';
+  }
+
   function renderHbh(trip) {
     const itin = trip.itinerary || [];
     const addDayOpen = !!openAddDay[trip.id];
@@ -2735,6 +2778,10 @@
       ''
     ];
     if (trip.notes) { lines.push(trip.notes, ''); }
+    if (trip.maps && trip.maps.length) {
+      trip.maps.forEach(m => lines.push('Map (' + m.label + '): ' + m.url));
+      lines.push('');
+    }
     (trip.itinerary || []).forEach(day => {
       lines.push(day.day + (day.label ? ' — ' + day.label : ''));
       (day.stops || []).forEach(s => {
@@ -2817,6 +2864,19 @@
         y += 5.5;
       });
       y += 5;
+    }
+
+    // Custom maps
+    if (trip.maps && trip.maps.length) {
+      trip.maps.forEach(m => {
+        ensureSpace(6);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(accent[0], accent[1], accent[2]);
+        doc.textWithLink('🗺 ' + m.label + ' map ↗', margin, y, { url: m.url });
+        y += 5.5;
+      });
+      y += 3;
     }
 
     (trip.itinerary || []).forEach(day => {
@@ -2916,6 +2976,7 @@
       '<div class="tb-detail' + (openDetail[trip.id] ? ' open' : '') + '" id="trv-detail-' + trip.id + '">' +
         '<div class="tb-detail-inner">' +
           (trip.notes ? escapeHtml(trip.notes) : '<em style="color:var(--sage-dim)">No notes yet.</em>') +
+          renderMaps(trip) +
           '<div class="tb-detail-actions">' +
             '<button class="tb-link-btn edit" data-edit="' + trip.id + '">Edit</button>' +
             '<button class="tb-link-btn del" data-del="' + trip.id + '">Remove</button>' +
@@ -3020,6 +3081,52 @@
         e.stopPropagation();
         const trip = trips.find(t => t.id === btn.getAttribute('data-email'));
         if (trip) emailTrip(trip);
+      });
+    });
+
+    listEl.querySelectorAll('[data-map-addtoggle]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openMapAdd[btn.getAttribute('data-map-addtoggle')] = true;
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-map-addcancel]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openMapAdd[btn.getAttribute('data-map-addcancel')] = false;
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-add-map]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const tripId = btn.getAttribute('data-add-map');
+        const panel = btn.closest('.tb-form');
+        const label = panel.querySelector('[data-newmap-label]').value.trim();
+        const url = panel.querySelector('[data-newmap-url]').value.trim();
+        if (!label || !url) return;
+        const trip = trips.find(t => t.id === tripId);
+        trip.maps = trip.maps || [];
+        trip.maps.push({ label, url });
+        openMapAdd[tripId] = false;
+        await save();
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-map-del]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const [tripId, mi] = btn.getAttribute('data-map-del').split('::');
+        const trip = trips.find(t => t.id === tripId);
+        if (trip && trip.maps) {
+          trip.maps.splice(parseInt(mi, 10), 1);
+          await save();
+          render();
+        }
       });
     });
 
