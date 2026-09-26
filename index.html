@@ -1388,16 +1388,31 @@
     btn.addEventListener('click', function() { switchHub(btn.getAttribute('data-goto')); });
   });
 
-  // Restore whichever tab (and school sub-tab) the user was last on, so a
-  // refresh doesn't bounce back to Home.
-  try {
-    const savedView = localStorage.getItem('hub:activeView');
-    if (savedView && document.getElementById('view-' + savedView)) switchHub(savedView, { skipPersist: true });
-  } catch (e) {}
-  try {
-    const savedSub = localStorage.getItem('hub:activeSchoolSub');
-    if (savedSub && document.getElementById('subview-' + savedSub)) switchSchoolSub(savedSub, { skipPersist: true });
-  } catch (e) {}
+  // A link like #travel/atl-sav (used by PDF/email exports to deep-link
+  // back to a specific trip) takes priority over the last-visited tab.
+  function parseHashRoute() {
+    const h = (location.hash || '').replace(/^#/, '');
+    if (!h) return null;
+    const [view, itemId] = h.split('/');
+    return { view: view, itemId: itemId || null };
+  }
+  const hashRoute = parseHashRoute();
+
+  if (hashRoute && document.getElementById('view-' + hashRoute.view)) {
+    switchHub(hashRoute.view);
+    if (hashRoute.itemId) window.__hubDeepLinkItem = hashRoute.itemId;
+  } else {
+    // Restore whichever tab (and school sub-tab) the user was last on, so a
+    // refresh doesn't bounce back to Home.
+    try {
+      const savedView = localStorage.getItem('hub:activeView');
+      if (savedView && document.getElementById('view-' + savedView)) switchHub(savedView, { skipPersist: true });
+    } catch (e) {}
+    try {
+      const savedSub = localStorage.getItem('hub:activeSchoolSub');
+      if (savedSub && document.getElementById('subview-' + savedSub)) switchSchoolSub(savedSub, { skipPersist: true });
+    } catch (e) {}
+  }
 })();
 </script>
 
@@ -2431,6 +2446,7 @@
 <script>
 (function() {
   const STORAGE_KEY = 'listboard:travel-tracker';
+  const HUB_BASE_URL = 'https://miguelldomingo-max.github.io/shiny/';
   const listEl = document.getElementById('trv-list');
   const formSlot = document.getElementById('trv-form-slot');
   const addToggle = document.getElementById('trv-add-toggle');
@@ -2474,6 +2490,20 @@
     return stop.todos[ti] || null;
   }
 
+  function openDeepLinkedTrip() {
+    const tripId = window.__hubDeepLinkItem;
+    if (!tripId) return;
+    window.__hubDeepLinkItem = null;
+    const trip = trips.find(t => t.id === tripId);
+    if (!trip) return;
+    openDetail[tripId] = true;
+    render();
+    setTimeout(() => {
+      const el = document.getElementById('trv-detail-' + tripId);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  }
+
   function parseDate(s) {
     const [y,m,d] = s.split('-').map(Number);
     return new Date(y, m-1, d);
@@ -2514,6 +2544,7 @@
     }
     if (window.logDiagnostic) window.logDiagnostic('board_loaded', { key: STORAGE_KEY, count: trips.length });
     render();
+    openDeepLinkedTrip();
   }
 
   async function save() {
@@ -2752,6 +2783,13 @@
       doc.line(margin, y, pageWidth - margin, y);
       y += 6;
     }
+
+    // Link back to this trip on the hub
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(accent[0], accent[1], accent[2]);
+    doc.textWithLink('View on Family Hub ↗', margin, y, { url: HUB_BASE_URL + '#travel/' + trip.id });
+    y += 8;
 
     // Title
     doc.setFont('helvetica', 'bold');
