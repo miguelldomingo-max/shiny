@@ -807,6 +807,16 @@
     gap: 10px;
     padding: 3px 0;
   }
+  .tb-map-block {
+    margin-bottom: 8px;
+  }
+  .tb-map-embed {
+    width: 100%;
+    height: 280px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    margin-top: 6px;
+  }
 
   /* form */
   .tb-form {
@@ -2630,16 +2640,31 @@
     '</div>';
   }
 
+  function mapEmbedUrl(url) {
+    const myMapsMatch = url.match(/\/maps\/d\/.*[?&]mid=([^&]+)/);
+    if (myMapsMatch) return 'https://www.google.com/maps/d/embed?mid=' + myMapsMatch[1];
+    const pinMatch = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*),?(\d+)?z?/);
+    if (pinMatch) {
+      const zoom = pinMatch[3] || '13';
+      return 'https://www.google.com/maps?q=' + pinMatch[1] + ',' + pinMatch[2] + '&z=' + zoom + '&output=embed';
+    }
+    return null;
+  }
+
   function renderMaps(trip) {
     const maps = trip.maps || [];
     const addOpen = !!openMapAdd[trip.id];
 
-    const rows = maps.map((m, mi) => (
-      '<div class="tb-map-row">' +
-        '<a class="tb-link-btn hbh" href="' + escapeHtml(m.url) + '" target="_blank" rel="noopener">🗺️ ' + escapeHtml(m.label) + ' ↗</a>' +
-        '<button class="tb-link-btn del" data-map-del="' + trip.id + '::' + mi + '" title="Remove map">✕</button>' +
-      '</div>'
-    )).join('');
+    const rows = maps.map((m, mi) => {
+      const embedUrl = mapEmbedUrl(m.url);
+      return '<div class="tb-map-block">' +
+        '<div class="tb-map-row">' +
+          '<a class="tb-link-btn hbh" href="' + escapeHtml(m.url) + '" target="_blank" rel="noopener">🗺️ ' + escapeHtml(m.label) + ' ↗</a>' +
+          '<button class="tb-link-btn del" data-map-del="' + trip.id + '::' + mi + '" title="Remove map">✕</button>' +
+        '</div>' +
+        (embedUrl ? '<iframe class="tb-map-embed" src="' + escapeHtml(embedUrl) + '" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>' : '') +
+      '</div>';
+    }).join('');
 
     const addForm = !addOpen ? '' :
       '<div class="tb-form" style="margin-top:8px;">' +
