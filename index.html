@@ -2678,7 +2678,7 @@
           '<a class="tb-link-btn hbh" href="' + escapeHtml(m.url) + '" target="_blank" rel="noopener">🗺️ ' + escapeHtml(m.label) + ' ↗</a>' +
           '<button class="tb-link-btn del" data-map-del="' + trip.id + '::' + mi + '" title="Remove map">✕</button>' +
         '</div>' +
-        (embedUrl ? '<iframe class="tb-map-embed" src="' + escapeHtml(embedUrl) + '" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>' : '') +
+        (embedUrl ? '<iframe class="tb-map-embed" src="' + escapeHtml(embedUrl) + '" referrerpolicy="no-referrer-when-downgrade"></iframe>' : '') +
       '</div>';
     }).join('');
 
