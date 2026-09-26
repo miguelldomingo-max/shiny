@@ -2657,6 +2657,7 @@
   }
 
   function mapEmbedUrl(url) {
+    if (/\/maps\/embed\?/.test(url)) return url; // Google's "Embed a map" URL is already embed-ready
     const myMapsMatch = url.match(/\/maps\/d\/.*[?&]mid=([^&]+)/);
     if (myMapsMatch) return 'https://www.google.com/maps/d/embed?mid=' + myMapsMatch[1];
     const pinMatch = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*),?(\d+)?z?/);
@@ -2665,6 +2666,17 @@
       return 'https://www.google.com/maps?q=' + pinMatch[1] + ',' + pinMatch[2] + '&z=' + zoom + '&output=embed';
     }
     return null;
+  }
+
+  // Google's "Embed a map" share option copies the whole <iframe ...> tag,
+  // not just the URL — people paste that in whole surprisingly often. Pull
+  // the real src out of it, or trim trailing HTML-attribute soup off a bare
+  // URL that had the rest of the tag pasted after it.
+  function extractMapUrl(raw) {
+    const srcMatch = raw.match(/src=["']([^"']+)["']/);
+    if (srcMatch) return srcMatch[1];
+    const cutIdx = raw.search(/["'\s]/);
+    return cutIdx === -1 ? raw : raw.slice(0, cutIdx);
   }
 
   function renderMaps(trip) {
@@ -3147,7 +3159,7 @@
         const tripId = btn.getAttribute('data-add-map');
         const panel = btn.closest('.tb-form');
         const label = panel.querySelector('[data-newmap-label]').value.trim();
-        const url = panel.querySelector('[data-newmap-url]').value.trim();
+        const url = extractMapUrl(panel.querySelector('[data-newmap-url]').value.trim());
         if (!label || !url) return;
         const trip = trips.find(t => t.id === tripId);
         trip.maps = trip.maps || [];
