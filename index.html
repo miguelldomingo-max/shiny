@@ -796,26 +796,21 @@
     padding: 5px 8px;
   }
 
-  .tb-maps {
-    margin-top: 12px;
-    padding-top: 10px;
-    border-top: 1px dashed var(--line);
+  .tb-stop-map {
+    margin-top: 8px;
   }
-  .tb-map-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 3px 0;
-  }
-  .tb-map-block {
-    margin-bottom: 8px;
+  .tb-stop-map-query {
+    font-size: 10.5px;
+    color: var(--sage-dim);
+    font-style: italic;
   }
   .tb-map-embed {
     width: 100%;
-    height: 280px;
+    height: 220px;
     border: 1px solid var(--line);
     border-radius: 6px;
     margin-top: 6px;
+    display: block;
   }
 
   /* form */
@@ -2501,7 +2496,7 @@
   const openAddDay = {};      // tripId -> bool, whether the "+ Add day" form is expanded
   const openAddStop = {};     // dayKey (tripId::dayIdx) -> bool, whether "+ Add stop" form is expanded
   const openTodoAdd = {};     // stopKey -> bool, whether the "+ Add" to-do input is expanded
-  const openMapAdd = {};      // tripId -> bool, whether the "+ Add map" form is expanded
+  const openStopMap = {};     // stopKey -> bool, whether that stop's auto map is expanded
   let editingStop = null;     // stopKey currently being edited, or null
   let editingTodo = null;     // todoKey currently being edited, or null
 
@@ -2656,60 +2651,29 @@
     '</div>';
   }
 
-  function mapEmbedUrl(url) {
-    if (/\/maps\/embed\?/.test(url)) return url; // Google's "Embed a map" URL is already embed-ready
-    const myMapsMatch = url.match(/\/maps\/d\/.*[?&]mid=([^&]+)/);
-    if (myMapsMatch) return 'https://www.google.com/maps/d/embed?mid=' + myMapsMatch[1];
-    const pinMatch = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*),?(\d+)?z?/);
-    if (pinMatch) {
-      const zoom = pinMatch[3] || '13';
-      return 'https://www.google.com/maps?q=' + pinMatch[1] + ',' + pinMatch[2] + '&z=' + zoom + '&output=embed';
-    }
-    return null;
+  // Auto-derived, no manual link entry: search Google Maps for the stop's
+  // own title (stripping a "Dinner:"/"Lunch:" style label prefix) plus the
+  // trip's destination for disambiguation. The plain q=...&output=embed
+  // form needs no API key, unlike most Maps Embed API URLs.
+  // stop.mapQuery, when set, is used verbatim (it's a precise override the
+  // user typed in) — otherwise fall back to a best-guess built from the
+  // stop's own title plus the trip destination for disambiguation.
+  function stopMapQuery(stop, trip) {
+    if (stop.mapQuery && stop.mapQuery.trim()) return stop.mapQuery.trim();
+    const cleaned = (stop.title || '').replace(/^(Breakfast|Lunch|Dinner|Drinks?)\s*:\s*/i, '').trim();
+    if (!cleaned) return '';
+    return trip.destination ? cleaned + ', ' + trip.destination : cleaned;
   }
 
-  // Google's "Embed a map" share option copies the whole <iframe ...> tag,
-  // not just the URL — people paste that in whole surprisingly often. Pull
-  // the real src out of it, or trim trailing HTML-attribute soup off a bare
-  // URL that had the rest of the tag pasted after it.
-  function extractMapUrl(raw) {
-    const srcMatch = raw.match(/src=["']([^"']+)["']/);
-    if (srcMatch) return srcMatch[1];
-    const cutIdx = raw.search(/["'\s]/);
-    return cutIdx === -1 ? raw : raw.slice(0, cutIdx);
-  }
-
-  function renderMaps(trip) {
-    const maps = trip.maps || [];
-    const addOpen = !!openMapAdd[trip.id];
-
-    const rows = maps.map((m, mi) => {
-      const embedUrl = mapEmbedUrl(m.url);
-      return '<div class="tb-map-block">' +
-        '<div class="tb-map-row">' +
-          '<a class="tb-link-btn hbh" href="' + escapeHtml(m.url) + '" target="_blank" rel="noopener">🗺️ ' + escapeHtml(m.label) + ' ↗</a>' +
-          '<button class="tb-link-btn del" data-map-del="' + trip.id + '::' + mi + '" title="Remove map">✕</button>' +
-        '</div>' +
-        (embedUrl ? '<iframe class="tb-map-embed" src="' + escapeHtml(embedUrl) + '" referrerpolicy="no-referrer-when-downgrade"></iframe>' : '') +
-      '</div>';
-    }).join('');
-
-    const addForm = !addOpen ? '' :
-      '<div class="tb-form" style="margin-top:8px;">' +
-        '<div class="tb-form-grid">' +
-          '<div class="tb-field"><label>LABEL</label><input type="text" data-newmap-label placeholder="e.g. Atlanta"></div>' +
-          '<div class="tb-field full"><label>MAP URL</label><input type="text" data-newmap-url placeholder="https://maps.google.com/..."></div>' +
-        '</div>' +
-        '<div class="tb-form-actions">' +
-          '<button class="tb-btn secondary" data-map-addcancel="' + trip.id + '">Cancel</button>' +
-          '<button class="tb-btn primary" data-add-map="' + trip.id + '">+ Add map</button>' +
-        '</div>' +
-      '</div>';
-
-    return '<div class="tb-maps">' +
-      rows +
-      (!addOpen ? '<div class="tb-hbh-toggle-row"><button class="tb-link-btn edit" data-map-addtoggle="' + trip.id + '">+ Add map</button></div>' : '') +
-      addForm +
+  function renderStopMap(sKey, stop, trip) {
+    const query = stopMapQuery(stop, trip);
+    if (!query) return '';
+    const embedUrl = 'https://www.google.com/maps?q=' + encodeURIComponent(query) + '&output=embed';
+    const open = !!openStopMap[sKey];
+    return '<div class="tb-stop-map">' +
+      '<button class="tb-link-btn edit" data-stopmap-toggle="' + sKey + '">' + (open ? 'Hide map ↑' : 'Show map ↓') + '</button>' +
+      ' <span class="tb-stop-map-query">' + escapeHtml(query) + '</span>' +
+      (open ? '<iframe class="tb-map-embed" src="' + escapeHtml(embedUrl) + '" referrerpolicy="no-referrer-when-downgrade"></iframe>' : '') +
     '</div>';
   }
 
@@ -2757,6 +2721,7 @@
               '<div class="tb-field"><label>TIME</label><input type="text" data-editstop-time value="' + escapeHtml(s.time) + '"></div>' +
               '<div class="tb-field"><label>TITLE</label><input type="text" data-editstop-title value="' + escapeHtml(s.title) + '"></div>' +
               '<div class="tb-field full"><label>DETAIL (optional)</label><input type="text" data-editstop-detail value="' + escapeHtml(s.detail || '') + '"></div>' +
+              '<div class="tb-field full"><label>MAP SEARCH (optional — pins one exact result)</label><input type="text" data-editstop-mapquery value="' + escapeHtml(s.mapQuery || '') + '" placeholder="e.g. The Escape Game Seattle Downtown"></div>' +
             '</div>' +
             '<div class="tb-form-actions">' +
               '<button class="tb-btn secondary" data-editstop-cancel="' + sKey + '">Cancel</button>' +
@@ -2784,6 +2749,7 @@
               '<button class="tb-link-btn edit" data-edit-stop="' + sKey + '">Edit</button>' +
               '<button class="tb-link-btn del" data-del-stop="' + sKey + '">Remove</button>' +
             '</div>' +
+            renderStopMap(sKey, s, trip) +
             renderTodos(sKey, todos)
           ) : '') +
         '</div>' +
@@ -3029,7 +2995,6 @@
       '<div class="tb-detail' + (openDetail[trip.id] ? ' open' : '') + '" id="trv-detail-' + trip.id + '">' +
         '<div class="tb-detail-inner">' +
           (trip.notes ? escapeHtml(trip.notes) : '<em style="color:var(--sage-dim)">No notes yet.</em>') +
-          renderMaps(trip) +
           '<div class="tb-detail-actions">' +
             '<button class="tb-link-btn edit" data-edit="' + trip.id + '">Edit</button>' +
             '<button class="tb-link-btn del" data-del="' + trip.id + '">Remove</button>' +
@@ -3137,49 +3102,12 @@
       });
     });
 
-    listEl.querySelectorAll('[data-map-addtoggle]').forEach(btn => {
+    listEl.querySelectorAll('[data-stopmap-toggle]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        openMapAdd[btn.getAttribute('data-map-addtoggle')] = true;
+        const key = btn.getAttribute('data-stopmap-toggle');
+        openStopMap[key] = !openStopMap[key];
         render();
-      });
-    });
-
-    listEl.querySelectorAll('[data-map-addcancel]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openMapAdd[btn.getAttribute('data-map-addcancel')] = false;
-        render();
-      });
-    });
-
-    listEl.querySelectorAll('[data-add-map]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const tripId = btn.getAttribute('data-add-map');
-        const panel = btn.closest('.tb-form');
-        const label = panel.querySelector('[data-newmap-label]').value.trim();
-        const url = extractMapUrl(panel.querySelector('[data-newmap-url]').value.trim());
-        if (!label || !url) return;
-        const trip = trips.find(t => t.id === tripId);
-        trip.maps = trip.maps || [];
-        trip.maps.push({ label, url });
-        openMapAdd[tripId] = false;
-        await save();
-        render();
-      });
-    });
-
-    listEl.querySelectorAll('[data-map-del]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const [tripId, mi] = btn.getAttribute('data-map-del').split('::');
-        const trip = trips.find(t => t.id === tripId);
-        if (trip && trip.maps) {
-          trip.maps.splice(parseInt(mi, 10), 1);
-          await save();
-          render();
-        }
       });
     });
 
@@ -3294,10 +3222,12 @@
           const time = panel.querySelector('[data-editstop-time]').value.trim();
           const title = panel.querySelector('[data-editstop-title]').value.trim();
           const detail = panel.querySelector('[data-editstop-detail]').value.trim();
+          const mapQuery = panel.querySelector('[data-editstop-mapquery]').value.trim();
           if (title) {
             stop.time = time || '—';
             stop.title = title;
             stop.detail = detail;
+            stop.mapQuery = mapQuery;
             editingStop = null;
             await save();
           }
