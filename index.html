@@ -705,6 +705,87 @@
     color: var(--sage-dim);
     opacity: 0.8;
   }
+  .tb-hbh-toggle-row {
+    margin-top: 10px;
+  }
+
+  /* stop expand/collapse + nested to-dos */
+  .tb-stop-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+  .tb-stop-title-row .tb-stop-title { flex: 1; }
+  .tb-stop-todocount {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--sage-dim);
+    flex-shrink: 0;
+  }
+  .tb-stop-chevron {
+    font-size: 13px;
+    color: var(--sage-dim);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+  .tb-stop-chevron.open { transform: rotate(90deg); color: var(--amber); }
+  .tb-stop-actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 14px;
+  }
+  .tb-todos {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--line);
+  }
+  .tb-todos-empty {
+    font-size: 11.5px;
+    color: var(--sage-dim);
+    font-style: italic;
+    margin-bottom: 6px;
+  }
+  .tb-todo-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+  }
+  .tb-todo-text {
+    flex: 1;
+    font-size: 12.5px;
+    color: var(--ink);
+  }
+  .tb-todo-text.done {
+    color: var(--sage-dim);
+    text-decoration: line-through;
+  }
+  .tb-todo-edit-input {
+    flex: 1;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--ink);
+    padding: 4px 6px;
+  }
+  .tb-todo-add-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .tb-todo-add-row input {
+    flex: 1;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--ink);
+    padding: 5px 8px;
+  }
 
   /* form */
   .tb-form {
@@ -929,6 +1010,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 (function() {
   // Bumped by hand on every deploy so a diagnostic log entry (or the
@@ -1257,22 +1339,28 @@
 
 <script>
 (function() {
-  function switchHub(key) {
+  function switchHub(key, opts) {
     document.querySelectorAll('.hub-tab').forEach(function(b) { b.classList.remove('active'); });
     document.querySelectorAll('.hub-view').forEach(function(v) { v.classList.remove('active'); });
     const btn = document.querySelector('.hub-tab[data-hubview="' + key + '"]');
     if (btn) btn.classList.add('active');
     const view = document.getElementById('view-' + key);
     if (view) view.classList.add('active');
+    if (!opts || !opts.skipPersist) {
+      try { localStorage.setItem('hub:activeView', key); } catch (e) {}
+    }
   }
 
-  function switchSchoolSub(key) {
+  function switchSchoolSub(key, opts) {
     document.querySelectorAll('.hub-subtab').forEach(function(b) { b.classList.remove('active'); });
     document.querySelectorAll('.hub-subview').forEach(function(v) { v.classList.remove('active'); });
     const btn = document.querySelector('.hub-subtab[data-subview="' + key + '"]');
     if (btn) btn.classList.add('active');
     const view = document.getElementById('subview-' + key);
     if (view) view.classList.add('active');
+    if (!opts || !opts.skipPersist) {
+      try { localStorage.setItem('hub:activeSchoolSub', key); } catch (e) {}
+    }
   }
 
   document.querySelectorAll('.hub-tab').forEach(function(btn) {
@@ -1290,6 +1378,17 @@
   document.querySelectorAll('.home-nav-btn').forEach(function(btn) {
     btn.addEventListener('click', function() { switchHub(btn.getAttribute('data-goto')); });
   });
+
+  // Restore whichever tab (and school sub-tab) the user was last on, so a
+  // refresh doesn't bounce back to Home.
+  try {
+    const savedView = localStorage.getItem('hub:activeView');
+    if (savedView && document.getElementById('view-' + savedView)) switchHub(savedView, { skipPersist: true });
+  } catch (e) {}
+  try {
+    const savedSub = localStorage.getItem('hub:activeSchoolSub');
+    if (savedSub && document.getElementById('subview-' + savedSub)) switchSchoolSub(savedSub, { skipPersist: true });
+  } catch (e) {}
 })();
 </script>
 
@@ -2335,9 +2434,35 @@
   const openDayIndex = {};
   const openHbh = {};
   const openDetail = {};
+  const openStops = {};       // stopKey -> bool, whether a stop's detail/to-dos are expanded
+  const openAddDay = {};      // tripId -> bool, whether the "+ Add day" form is expanded
+  const openAddStop = {};     // dayKey (tripId::dayIdx) -> bool, whether "+ Add stop" form is expanded
+  let editingStop = null;     // stopKey currently being edited, or null
+  let editingTodo = null;     // todoKey currently being edited, or null
 
   const today = new Date();
   today.setHours(0,0,0,0);
+
+  function stopKey(tripId, dayIdx, si) { return tripId + '::' + dayIdx + '::' + si; }
+
+  function findStop(sKey) {
+    const parts = sKey.split('::');
+    const si = parseInt(parts.pop(), 10);
+    const dayIdx = parseInt(parts.pop(), 10);
+    const tripId = parts.join('::');
+    const trip = trips.find(t => t.id === tripId);
+    const day = trip && (trip.itinerary || [])[dayIdx];
+    return day ? (day.stops[si] || null) : null;
+  }
+
+  function findTodo(tKey) {
+    const parts = tKey.split('::');
+    const ti = parseInt(parts.pop(), 10);
+    const stop = findStop(parts.join('::'));
+    if (!stop) return null;
+    stop.todos = stop.todos || [];
+    return stop.todos[ti] || null;
+  }
 
   function parseDate(s) {
     const [y,m,d] = s.split('-').map(Number);
@@ -2408,9 +2533,40 @@
     return div.innerHTML;
   }
 
+  function renderTodos(sKey, todos) {
+    const rows = todos.map((t, ti) => {
+      const tKey = sKey + '::' + ti;
+      if (editingTodo === tKey) {
+        return '<div class="tb-todo-row">' +
+          '<input type="text" class="tb-todo-edit-input" data-todo-edit-input="' + tKey + '" value="' + escapeHtml(t.text) + '">' +
+          '<button class="tb-link-btn edit" data-todo-save="' + tKey + '">Save</button>' +
+          '<button class="tb-link-btn del" data-todo-cancel="' + tKey + '">Cancel</button>' +
+        '</div>';
+      }
+      return '<div class="tb-todo-row">' +
+        '<input type="checkbox" ' + (t.done ? 'checked' : '') + ' data-todo-toggle="' + tKey + '">' +
+        '<span class="tb-todo-text' + (t.done ? ' done' : '') + '">' + escapeHtml(t.text) + '</span>' +
+        '<button class="tb-link-btn edit" data-todo-edit="' + tKey + '">Edit</button>' +
+        '<button class="tb-link-btn del" data-todo-del="' + tKey + '">✕</button>' +
+      '</div>';
+    }).join('');
+
+    return '<div class="tb-todos">' +
+      (rows || '<div class="tb-todos-empty">No to-dos yet.</div>') +
+      '<div class="tb-todo-add-row">' +
+        '<input type="text" placeholder="Add a to-do..." data-todo-newinput="' + sKey + '">' +
+        '<button class="tb-link-btn edit" data-todo-addbtn="' + sKey + '">+ Add</button>' +
+      '</div>' +
+    '</div>';
+  }
+
   function renderHbh(trip) {
     const itin = trip.itinerary || [];
-    const addDayForm =
+    const addDayOpen = !!openAddDay[trip.id];
+    const addDayToggle = '<div class="tb-hbh-toggle-row">' +
+      '<button class="tb-link-btn edit" data-toggle-addday="' + trip.id + '">' + (addDayOpen ? 'Cancel' : '+ Add day') + '</button>' +
+    '</div>';
+    const addDayForm = !addDayOpen ? '' :
       '<div class="tb-form" style="margin-top:10px;">' +
         '<div class="tb-form-grid">' +
           '<div class="tb-field"><label>DAY (e.g. TUE 10/6)</label><input type="text" data-newday-label placeholder="TUE 10/6"></div>' +
@@ -2424,28 +2580,77 @@
     if (itin.length === 0) {
       return '<div class="tb-hbh">' +
         '<div class="tb-hbh-empty">No hour-by-hour built for this trip yet.</div>' +
-        addDayForm +
+        addDayToggle + addDayForm +
       '</div>';
     }
 
     const activeIdx = Math.min(openDayIndex[trip.id] || 0, itin.length - 1);
     openDayIndex[trip.id] = activeIdx;
     const active = itin[activeIdx];
+    const dayKey = trip.id + '::' + activeIdx;
+    const addStopOpen = !!openAddStop[dayKey];
 
     const tabs = itin.map((d, i) => (
       '<button class="tb-daytab' + (i === activeIdx ? ' active' : '') + '" data-daytab="' + trip.id + '::' + i + '">' + escapeHtml(d.day) + '</button>'
     )).join('');
 
-    const stops = active.stops.map((s, si) => (
-      '<div class="tb-stop">' +
+    const stops = active.stops.map((s, si) => {
+      const sKey = stopKey(trip.id, activeIdx, si);
+
+      if (editingStop === sKey) {
+        return '<div class="tb-stop">' +
+          '<div class="tb-form" style="width:100%;margin:0;">' +
+            '<div class="tb-form-grid">' +
+              '<div class="tb-field"><label>TIME</label><input type="text" data-editstop-time value="' + escapeHtml(s.time) + '"></div>' +
+              '<div class="tb-field"><label>TITLE</label><input type="text" data-editstop-title value="' + escapeHtml(s.title) + '"></div>' +
+              '<div class="tb-field full"><label>DETAIL (optional)</label><input type="text" data-editstop-detail value="' + escapeHtml(s.detail || '') + '"></div>' +
+            '</div>' +
+            '<div class="tb-form-actions">' +
+              '<button class="tb-btn secondary" data-editstop-cancel="' + sKey + '">Cancel</button>' +
+              '<button class="tb-btn primary" data-editstop-save="' + sKey + '">Save</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }
+
+      const todos = s.todos || [];
+      const doneCount = todos.filter(t => t.done).length;
+      const isOpen = !!openStops[sKey];
+
+      return '<div class="tb-stop">' +
         '<div class="tb-stop-time">' + escapeHtml(s.time) + '</div>' +
         '<div class="tb-stop-body">' +
-          '<div class="tb-stop-title">' + escapeHtml(s.title) + '</div>' +
-          (s.detail ? '<div class="tb-stop-detail">' + escapeHtml(s.detail) + '</div>' : '') +
+          '<div class="tb-stop-title-row" data-stop-toggle="' + sKey + '">' +
+            '<div class="tb-stop-title">' + escapeHtml(s.title) + '</div>' +
+            (todos.length ? '<span class="tb-stop-todocount">' + doneCount + '/' + todos.length + '</span>' : '') +
+            '<span class="tb-stop-chevron' + (isOpen ? ' open' : '') + '">›</span>' +
+          '</div>' +
+          (isOpen ? (
+            (s.detail ? '<div class="tb-stop-detail">' + escapeHtml(s.detail) + '</div>' : '') +
+            '<div class="tb-stop-actions">' +
+              '<button class="tb-link-btn edit" data-edit-stop="' + sKey + '">Edit</button>' +
+              '<button class="tb-link-btn del" data-del-stop="' + sKey + '">Remove</button>' +
+            '</div>' +
+            renderTodos(sKey, todos)
+          ) : '') +
         '</div>' +
-        '<button class="tb-link-btn del" data-del-stop="' + trip.id + '::' + activeIdx + '::' + si + '" title="Remove stop">✕</button>' +
-      '</div>'
-    )).join('');
+      '</div>';
+    }).join('');
+
+    const addStopToggle = '<div class="tb-hbh-toggle-row">' +
+      '<button class="tb-link-btn edit" data-toggle-addstop="' + dayKey + '">' + (addStopOpen ? 'Cancel' : '+ Add stop') + '</button>' +
+    '</div>';
+    const addStopForm = !addStopOpen ? '' :
+      '<div class="tb-form" style="margin-top:10px;">' +
+        '<div class="tb-form-grid">' +
+          '<div class="tb-field"><label>TIME</label><input type="text" data-newstop-time placeholder="e.g. 3:55 PM"></div>' +
+          '<div class="tb-field"><label>TITLE</label><input type="text" data-newstop-title placeholder="e.g. Depart SEA"></div>' +
+          '<div class="tb-field full"><label>DETAIL (optional)</label><input type="text" data-newstop-detail placeholder=""></div>' +
+        '</div>' +
+        '<div class="tb-form-actions">' +
+          '<button class="tb-btn primary" data-add-stop="' + dayKey + '">+ Add stop</button>' +
+        '</div>' +
+      '</div>';
 
     return '<div class="tb-hbh">' +
       '<div class="tb-daytabs">' + tabs + '</div>' +
@@ -2454,19 +2659,64 @@
         '<button class="tb-link-btn del" data-del-day="' + trip.id + '::' + activeIdx + '">Remove day</button>' +
       '</div>' +
       (stops || '<div class="tb-hbh-empty">No stops yet.</div>') +
-      '<div class="tb-form" style="margin-top:10px;">' +
-        '<div class="tb-form-grid">' +
-          '<div class="tb-field"><label>TIME</label><input type="text" data-newstop-time placeholder="e.g. 3:55 PM"></div>' +
-          '<div class="tb-field"><label>TITLE</label><input type="text" data-newstop-title placeholder="e.g. Depart SEA"></div>' +
-          '<div class="tb-field full"><label>DETAIL (optional)</label><input type="text" data-newstop-detail placeholder=""></div>' +
-        '</div>' +
-        '<div class="tb-form-actions">' +
-          '<button class="tb-btn primary" data-add-stop="' + trip.id + '::' + activeIdx + '">+ Add stop</button>' +
-        '</div>' +
-      '</div>' +
-      addDayForm +
+      addStopToggle + addStopForm +
+      addDayToggle + addDayForm +
       (trip.itinSource ? '<div class="tb-hbh-source">' + escapeHtml(trip.itinSource) + '</div>' : '') +
     '</div>';
+  }
+
+  function buildTripText(trip) {
+    const STATUS_LABELS = { researching: 'Researching', planning: 'Planning', confirmed: 'Confirmed', break: 'School break' };
+    const statusLabel = STATUS_LABELS[trip.status] || trip.status;
+    const lines = [
+      trip.destination,
+      fmtRange(trip.start, trip.end) + (trip.approx ? ' (est.)' : ''),
+      'Status: ' + statusLabel,
+      ''
+    ];
+    if (trip.notes) { lines.push(trip.notes, ''); }
+    (trip.itinerary || []).forEach(day => {
+      lines.push(day.day + (day.label ? ' — ' + day.label : ''));
+      (day.stops || []).forEach(s => {
+        lines.push('  ' + s.time + '  ' + s.title + (s.detail ? ' — ' + s.detail : ''));
+        (s.todos || []).forEach(t => {
+          lines.push('    [' + (t.done ? 'x' : ' ') + '] ' + t.text);
+        });
+      });
+      lines.push('');
+    });
+    return lines.join('\n').trim();
+  }
+
+  function exportTripPdf(trip) {
+    if (!window.jspdf) {
+      if (window.hubToast) window.hubToast("PDF library didn't load — check your connection and try again.", { error: true });
+      return;
+    }
+    const doc = new window.jspdf.jsPDF();
+    const text = buildTripText(trip);
+    const margin = 14;
+    const maxWidth = 180;
+    const lines = doc.splitTextToSize(text, maxWidth);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    const lineHeight = 6;
+    const pageHeight = doc.internal.pageSize.getHeight();
+    let y = margin;
+    lines.forEach(line => {
+      if (y > pageHeight - margin) { doc.addPage(); y = margin; }
+      doc.text(line, margin, y);
+      y += lineHeight;
+    });
+    const filename = (trip.destination || 'trip').replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '-itinerary.pdf';
+    doc.save(filename);
+  }
+
+  function emailTrip(trip) {
+    const subject = 'Itinerary: ' + trip.destination;
+    const body = buildTripText(trip);
+    const mailto = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    window.location.href = mailto;
   }
 
   function buildRow(trip) {
@@ -2501,6 +2751,8 @@
             '<button class="tb-link-btn edit" data-edit="' + trip.id + '">Edit</button>' +
             '<button class="tb-link-btn del" data-del="' + trip.id + '">Remove</button>' +
             '<button class="tb-link-btn hbh" data-hbh="' + trip.id + '">Hour by hour ' + (openHbh[trip.id] ? '↑' : '↓') + '</button>' +
+            '<button class="tb-link-btn edit" data-pdf="' + trip.id + '">Export PDF</button>' +
+            '<button class="tb-link-btn edit" data-email="' + trip.id + '">Email</button>' +
           '</div>' +
           '<div id="hbh-slot-' + trip.id + '">' + (openHbh[trip.id] ? renderHbh(trip) : '') + '</div>' +
         '</div>' +
@@ -2623,11 +2875,38 @@
       });
     });
 
+    listEl.querySelectorAll('[data-pdf]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const trip = trips.find(t => t.id === btn.getAttribute('data-pdf'));
+        if (trip) exportTripPdf(trip);
+      });
+    });
+
+    listEl.querySelectorAll('[data-email]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const trip = trips.find(t => t.id === btn.getAttribute('data-email'));
+        if (trip) emailTrip(trip);
+      });
+    });
+
     listEl.querySelectorAll('[data-daytab]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const [tripId, idx] = btn.getAttribute('data-daytab').split('::');
         openDayIndex[tripId] = parseInt(idx, 10);
+        editingStop = null;
+        editingTodo = null;
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-toggle-addday]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-toggle-addday');
+        openAddDay[id] = !openAddDay[id];
         render();
       });
     });
@@ -2644,6 +2923,7 @@
         trip.itinerary = trip.itinerary || [];
         trip.itinerary.push({ day: dayLabel, label: dayTitle, stops: [] });
         openDayIndex[tripId] = trip.itinerary.length - 1;
+        openAddDay[tripId] = false;
         await save();
         render();
       });
@@ -2661,6 +2941,15 @@
       });
     });
 
+    listEl.querySelectorAll('[data-toggle-addstop]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const key = btn.getAttribute('data-toggle-addstop');
+        openAddStop[key] = !openAddStop[key];
+        render();
+      });
+    });
+
     listEl.querySelectorAll('[data-add-stop]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -2671,8 +2960,56 @@
         const detail = panel.querySelector('[data-newstop-detail]').value.trim();
         if (!title) return;
         const trip = trips.find(t => t.id === tripId);
-        trip.itinerary[parseInt(dayIdx, 10)].stops.push({ time: time || '—', title, detail });
+        trip.itinerary[parseInt(dayIdx, 10)].stops.push({ time: time || '—', title, detail, todos: [] });
+        openAddStop[tripId + '::' + dayIdx] = false;
         await save();
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-stop-toggle]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const key = el.getAttribute('data-stop-toggle');
+        openStops[key] = !openStops[key];
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-edit-stop]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        editingStop = btn.getAttribute('data-edit-stop');
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-editstop-cancel]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        editingStop = null;
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-editstop-save]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const sKey = btn.getAttribute('data-editstop-save');
+        const panel = btn.closest('.tb-stop');
+        const stop = findStop(sKey);
+        if (stop && panel) {
+          const time = panel.querySelector('[data-editstop-time]').value.trim();
+          const title = panel.querySelector('[data-editstop-title]').value.trim();
+          const detail = panel.querySelector('[data-editstop-detail]').value.trim();
+          if (title) {
+            stop.time = time || '—';
+            stop.title = title;
+            stop.detail = detail;
+            editingStop = null;
+            await save();
+          }
+        }
         render();
       });
     });
@@ -2685,6 +3022,96 @@
         trip.itinerary[parseInt(dayIdx, 10)].stops.splice(parseInt(stopIdx, 10), 1);
         await save();
         render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-todo-toggle]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const todo = findTodo(el.getAttribute('data-todo-toggle'));
+        if (todo) {
+          todo.done = !todo.done;
+          await save();
+          render();
+        }
+      });
+    });
+
+    listEl.querySelectorAll('[data-todo-edit]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        editingTodo = btn.getAttribute('data-todo-edit');
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-todo-cancel]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        editingTodo = null;
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-todo-save]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const tKey = btn.getAttribute('data-todo-save');
+        const row = btn.closest('.tb-todo-row');
+        const todo = findTodo(tKey);
+        const input = row ? row.querySelector('[data-todo-edit-input]') : null;
+        if (todo && input) {
+          const text = input.value.trim();
+          if (text) {
+            todo.text = text;
+            editingTodo = null;
+            await save();
+          }
+        }
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-todo-del]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const parts = btn.getAttribute('data-todo-del').split('::');
+        const ti = parseInt(parts.pop(), 10);
+        const stop = findStop(parts.join('::'));
+        if (stop && stop.todos) {
+          stop.todos.splice(ti, 1);
+          await save();
+          render();
+        }
+      });
+    });
+
+    listEl.querySelectorAll('[data-todo-addbtn]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const sKey = btn.getAttribute('data-todo-addbtn');
+        const row = btn.closest('.tb-todo-add-row');
+        const input = row.querySelector('[data-todo-newinput]');
+        const text = input.value.trim();
+        if (!text) return;
+        const stop = findStop(sKey);
+        if (stop) {
+          stop.todos = stop.todos || [];
+          stop.todos.push({ text, done: false });
+          await save();
+          render();
+        }
+      });
+    });
+
+    listEl.querySelectorAll('[data-todo-newinput]').forEach(input => {
+      input.addEventListener('click', (e) => e.stopPropagation());
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const sKey = input.getAttribute('data-todo-newinput');
+          listEl.querySelector('[data-todo-addbtn="' + sKey + '"]').click();
+        }
       });
     });
   }
