@@ -1098,6 +1098,21 @@
   var forgotError = document.getElementById('forgot-error');
   var authFired = false;
 
+  // Every board's save() overwrites its whole hub_data row — there's no
+  // merge. Without this, a tab with stale in-memory data that saves
+  // *anything* silently clobbers changes another tab made in the
+  // meantime (observed losing an added map link and a to-do this way).
+  // Subscribing to Postgres changes on hub_data and re-firing the same
+  // 'hub:visible' event every board already reloads on closes most of
+  // that staleness window by pulling in remote writes as they happen.
+  function subscribeRealtime() {
+    sb.channel('hub_data_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hub_data' }, function() {
+        window.dispatchEvent(new Event('hub:visible'));
+      })
+      .subscribe();
+  }
+
   function showApp() {
     gate.style.display = 'none';
     hubRoot.style.display = '';
@@ -1115,6 +1130,7 @@
       window.__hubAuthenticated = true;
       logDiagnostic('hub_authenticated');
       window.dispatchEvent(new Event('hub:authenticated'));
+      subscribeRealtime();
     }
   }
 
