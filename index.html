@@ -552,6 +552,10 @@
     line-height: 1;
   }
   .tb-days.past { color: var(--sage-dim); }
+  .tb-row.is-break .tb-days,
+  .tb-row.is-break .tb-days-unit,
+  .tb-row.is-break .tb-dest,
+  .tb-row.is-break .tb-dates { color: var(--sage-dim); }
   .tb-days-unit {
     display: block;
     font-size: 9px;
@@ -2687,13 +2691,16 @@
     '</div>';
   }
 
+  const TRIP_STATUS_LABELS = { researching: 'Researching', planning: 'Planning', confirmed: 'Confirmed', break: 'School break' };
+  function tripStatusLabel(trip) {
+    return TRIP_STATUS_LABELS[trip.status] || trip.status;
+  }
+
   function buildTripText(trip) {
-    const STATUS_LABELS = { researching: 'Researching', planning: 'Planning', confirmed: 'Confirmed', break: 'School break' };
-    const statusLabel = STATUS_LABELS[trip.status] || trip.status;
     const lines = [
       trip.destination,
       fmtRange(trip.start, trip.end) + (trip.approx ? ' (est.)' : ''),
-      'Status: ' + statusLabel,
+      'Status: ' + tripStatusLabel(trip),
       ''
     ];
     if (trip.notes) { lines.push(trip.notes, ''); }
@@ -2715,21 +2722,123 @@
       if (window.hubToast) window.hubToast("PDF library didn't load — check your connection and try again.", { error: true });
       return;
     }
+
     const doc = new window.jspdf.jsPDF();
-    const text = buildTripText(trip);
-    const margin = 14;
-    const maxWidth = 180;
-    const lines = doc.splitTextToSize(text, maxWidth);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-    const lineHeight = 6;
+    const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 16;
+    const usableWidth = pageWidth - margin * 2;
+    const timeColWidth = 34;
+    const gutter = 6;
+    const detailColX = margin + timeColWidth + gutter;
+    const detailColWidth = usableWidth - timeColWidth - gutter;
+
+    const ink = [24, 30, 27];
+    const muted = [110, 122, 115];
+    const accent = [176, 116, 46];
+
     let y = margin;
-    lines.forEach(line => {
-      if (y > pageHeight - margin) { doc.addPage(); y = margin; }
-      doc.text(line, margin, y);
-      y += lineHeight;
+
+    function ensureSpace(h) {
+      if (y + h > pageHeight - margin) {
+        doc.addPage();
+        y = margin;
+      }
+    }
+
+    function drawRule(color, weight) {
+      doc.setDrawColor(color[0], color[1], color[2]);
+      doc.setLineWidth(weight);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 6;
+    }
+
+    // Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(19);
+    doc.setTextColor(ink[0], ink[1], ink[2]);
+    doc.text(trip.destination || 'Trip', margin, y);
+    y += 8;
+
+    // Dates + status
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10.5);
+    doc.setTextColor(muted[0], muted[1], muted[2]);
+    doc.text(fmtRange(trip.start, trip.end) + (trip.approx ? ' (est.)' : '') + '   •   ' + tripStatusLabel(trip), margin, y);
+    y += 7;
+    drawRule(muted, 0.3);
+
+    // Notes
+    if (trip.notes) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10.5);
+      doc.setTextColor(ink[0], ink[1], ink[2]);
+      doc.splitTextToSize(trip.notes, usableWidth).forEach(line => {
+        ensureSpace(6);
+        doc.text(line, margin, y);
+        y += 5.5;
+      });
+      y += 5;
+    }
+
+    (trip.itinerary || []).forEach(day => {
+      ensureSpace(15);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(accent[0], accent[1], accent[2]);
+      doc.text(day.day + (day.label ? '  —  ' + day.label : ''), margin, y);
+      y += 5;
+      drawRule(accent, 0.5);
+
+      (day.stops || []).forEach(s => {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9.5);
+        const timeLines = doc.splitTextToSize(s.time || '—', timeColWidth);
+        const detailLines = s.detail ? doc.splitTextToSize(s.detail, detailColWidth) : [];
+        const todos = s.todos || [];
+        const rightLineCount = 1 + detailLines.length + todos.length;
+        const blockHeight = Math.max(rightLineCount * 5, timeLines.length * 5) + 4;
+        ensureSpace(blockHeight);
+
+        const blockTop = y;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(accent[0], accent[1], accent[2]);
+        timeLines.forEach((tl, i) => doc.text(tl, margin, blockTop + i * 5));
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10.5);
+        doc.setTextColor(ink[0], ink[1], ink[2]);
+        doc.text(s.title || '', detailColX, y);
+        y += 5;
+
+        if (detailLines.length) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9.5);
+          doc.setTextColor(muted[0], muted[1], muted[2]);
+          detailLines.forEach(line => {
+            doc.text(line, detailColX, y);
+            y += 4.8;
+          });
+        }
+
+        if (todos.length) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9.5);
+          doc.setTextColor(ink[0], ink[1], ink[2]);
+          todos.forEach(t => {
+            doc.text((t.done ? '[x] ' : '[ ] ') + t.text, detailColX, y);
+            y += 4.8;
+          });
+        }
+
+        y = Math.max(y, blockTop + timeLines.length * 5) + 3;
+      });
+
+      y += 4;
     });
+
     const filename = (trip.destination || 'trip').replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '-itinerary.pdf';
     doc.save(filename);
   }
@@ -2744,7 +2853,7 @@
   function buildRow(trip) {
     const d = daysUntil(trip.start, trip.end);
     const row = document.createElement('div');
-    row.className = 'tb-row';
+    row.className = 'tb-row' + (trip.status === 'break' ? ' is-break' : '');
 
     let dayLabel, dayUnit;
     if (d.state === 'now') { dayLabel = 'NOW'; dayUnit = 'traveling'; }
@@ -2816,61 +2925,24 @@
     }
     listEl.innerHTML = '';
 
-    const tripList = sorted.filter(t => t.status !== 'break');
-    const breakList = sorted.filter(t => t.status === 'break');
-    const tripsByMonth = groupByMonth(tripList);
-    const breaksByMonth = groupByMonth(breakList);
-    const monthKeys = Array.from(new Set([...Object.keys(tripsByMonth), ...Object.keys(breaksByMonth)])).sort();
+    const byMonth = groupByMonth(sorted);
+    const monthKeys = Object.keys(byMonth).sort();
 
-    const grid = document.createElement('div');
-    grid.className = 'tb-columns';
-
-    const headL = document.createElement('div');
-    headL.className = 'tb-column-title';
-    headL.textContent = 'TRIPS';
-    const headR = document.createElement('div');
-    headR.className = 'tb-column-title';
-    headR.textContent = "MIKA'S SCHOOL BREAKS";
-    grid.appendChild(headL);
-    grid.appendChild(headR);
+    const list = document.createElement('div');
+    list.className = 'tb-flat-list';
 
     monthKeys.forEach(key => {
-      const monthTrips = tripsByMonth[key] || [];
-      const monthBreaks = breaksByMonth[key] || [];
-      const sample = (monthTrips[0] || monthBreaks[0]);
+      const items = byMonth[key];
 
       const label = document.createElement('div');
       label.className = 'tb-month-label';
-      label.textContent = monthLabel(sample.start);
-      grid.appendChild(label);
+      label.textContent = monthLabel(items[0].start);
+      list.appendChild(label);
 
-      const colL = document.createElement('div');
-      colL.className = 'tb-month-col';
-      if (monthTrips.length === 0) {
-        const ph = document.createElement('div');
-        ph.className = 'tb-month-placeholder';
-        ph.textContent = '\u2014';
-        colL.appendChild(ph);
-      } else {
-        monthTrips.forEach(t => colL.appendChild(buildRow(t)));
-      }
-
-      const colR = document.createElement('div');
-      colR.className = 'tb-month-col';
-      if (monthBreaks.length === 0) {
-        const ph = document.createElement('div');
-        ph.className = 'tb-month-placeholder';
-        ph.textContent = '\u2014';
-        colR.appendChild(ph);
-      } else {
-        monthBreaks.forEach(t => colR.appendChild(buildRow(t)));
-      }
-
-      grid.appendChild(colL);
-      grid.appendChild(colR);
+      items.forEach(t => list.appendChild(buildRow(t)));
     });
 
-    listEl.appendChild(grid);
+    listEl.appendChild(list);
 
     listEl.querySelectorAll('[data-edit]').forEach(btn => {
       btn.addEventListener('click', (e) => {
