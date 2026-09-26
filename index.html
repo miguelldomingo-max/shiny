@@ -744,7 +744,12 @@
     font-size: 11.5px;
     color: var(--sage-dim);
     font-style: italic;
-    margin-bottom: 6px;
+  }
+  .tb-todos-empty-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
   }
   .tb-todo-row {
     display: flex;
@@ -2437,6 +2442,7 @@
   const openStops = {};       // stopKey -> bool, whether a stop's detail/to-dos are expanded
   const openAddDay = {};      // tripId -> bool, whether the "+ Add day" form is expanded
   const openAddStop = {};     // dayKey (tripId::dayIdx) -> bool, whether "+ Add stop" form is expanded
+  const openTodoAdd = {};     // stopKey -> bool, whether the "+ Add" to-do input is expanded
   let editingStop = null;     // stopKey currently being edited, or null
   let editingTodo = null;     // todoKey currently being edited, or null
 
@@ -2551,12 +2557,28 @@
       '</div>';
     }).join('');
 
-    return '<div class="tb-todos">' +
-      (rows || '<div class="tb-todos-empty">No to-dos yet.</div>') +
+    const addOpen = !!openTodoAdd[sKey];
+    const addRow = !addOpen ? '' :
       '<div class="tb-todo-add-row">' +
         '<input type="text" placeholder="Add a to-do..." data-todo-newinput="' + sKey + '">' +
         '<button class="tb-link-btn edit" data-todo-addbtn="' + sKey + '">+ Add</button>' +
-      '</div>' +
+        '<button class="tb-link-btn del" data-todo-addcancel="' + sKey + '">Cancel</button>' +
+      '</div>';
+
+    if (!rows) {
+      return '<div class="tb-todos">' +
+        '<div class="tb-todos-empty-row">' +
+          '<div class="tb-todos-empty">No to-dos yet.</div>' +
+          (!addOpen ? '<button class="tb-link-btn edit" data-todo-addtoggle="' + sKey + '">+ Add</button>' : '') +
+        '</div>' +
+        addRow +
+      '</div>';
+    }
+
+    return '<div class="tb-todos">' +
+      rows +
+      (!addOpen ? '<div class="tb-hbh-toggle-row"><button class="tb-link-btn edit" data-todo-addtoggle="' + sKey + '">+ Add</button></div>' : '') +
+      addRow +
     '</div>';
   }
 
@@ -3086,6 +3108,22 @@
       });
     });
 
+    listEl.querySelectorAll('[data-todo-addtoggle]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openTodoAdd[btn.getAttribute('data-todo-addtoggle')] = true;
+        render();
+      });
+    });
+
+    listEl.querySelectorAll('[data-todo-addcancel]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openTodoAdd[btn.getAttribute('data-todo-addcancel')] = false;
+        render();
+      });
+    });
+
     listEl.querySelectorAll('[data-todo-addbtn]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -3098,6 +3136,7 @@
         if (stop) {
           stop.todos = stop.todos || [];
           stop.todos.push({ text, done: false });
+          openTodoAdd[sKey] = false;
           await save();
           render();
         }
