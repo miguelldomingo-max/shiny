@@ -121,6 +121,8 @@
     --gold-dim: #9c8a3c;
     --lavender: #b49bd9;
     --lavender-dim: #7d6b96;
+    --teal: #4fb8ab;
+    --teal-dim: #366f67;
     font-family: 'IBM Plex Sans', -apple-system, sans-serif;
     background: var(--bg);
     color: var(--ink);
@@ -211,6 +213,7 @@
   .tb-filter-btn.active { border-color: var(--amber-dim); color: var(--amber); }
   .tb-filter-btn[data-catfilter="kids"].active { border-color: var(--rose-dim); color: var(--rose); }
   .tb-filter-btn[data-catfilter="school"].active { border-color: var(--sky-dim); color: var(--sky); }
+  .tb-filter-btn[data-catfilter="lakeridge"].active { border-color: var(--teal-dim); color: var(--teal); }
   .tb-filter-btn[data-catfilter="finance"].active { border-color: var(--gold-dim); color: var(--gold); }
   .tb-filter-btn[data-catfilter="personal"].active { border-color: var(--lavender-dim); color: var(--lavender); }
   .tb-schooltag {
@@ -587,6 +590,7 @@
   .tb-days.cat-travel { color: var(--amber); }
   .tb-days.cat-kids { color: var(--rose); }
   .tb-days.cat-school { color: var(--sky); }
+  .tb-days.cat-lakeridge { color: var(--teal); }
   .tb-days.cat-finance { color: var(--gold); }
   .tb-days.cat-personal { color: var(--lavender); }
   .tb-days.past { color: var(--sage-dim) !important; }
@@ -606,6 +610,7 @@
   .tb-days-unit.cat-travel { color: var(--amber-dim); }
   .tb-days-unit.cat-kids { color: var(--rose-dim); }
   .tb-days-unit.cat-school { color: var(--sky-dim); }
+  .tb-days-unit.cat-lakeridge { color: var(--teal-dim); }
   .tb-days-unit.cat-finance { color: var(--gold-dim); }
   .tb-days-unit.cat-personal { color: var(--lavender-dim); }
   .tb-main { flex: 1; min-width: 0; }
@@ -1798,12 +1803,10 @@
   function schoolTrips() {
     // trips holds the full shared Event array (now also storing the Travel
     // Tracker's items) -- this tab only ever displays the category:"school"
-    // subset, but keeps the whole array in memory so save() never drops
-    // items that belong to the other tab.
-    // Closures (category:"school", kind:"closure") were never part of this
-    // board's original 11 items -- they lived only in the travel tracker,
-    // just shaded. Exclude them here so this tab's contents match exactly
-    // what it showed before the two boards were merged.
+    // subset (the private-school application process), but keeps the whole
+    // array in memory so save() never drops items that belong to the other
+    // tab. MISD/Lakeridge closures live under category:"lakeridge" now, not
+    // "school" -- the kind!=="closure" check is kept as a defensive no-op.
     return trips.filter(t => t.category === 'school' && t.kind !== 'closure');
   }
 
@@ -2515,7 +2518,8 @@
   const CATEGORIES = [
     { key: 'travel', label: 'Travel' },
     { key: 'kids', label: 'Kids' },
-    { key: 'school', label: 'School' },
+    { key: 'lakeridge', label: 'Lakeridge' },
+    { key: 'school', label: 'School Apps' },
     { key: 'finance', label: 'Finance' },
     { key: 'personal', label: 'Personal' },
   ];
@@ -3350,6 +3354,10 @@
             '<option value="done"' + (trip && trip.status === 'done' ? ' selected' : '') + '>Done</option>' +
             '<option value="cancelled"' + (trip && trip.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option>' +
           '</select></div>' +
+          '<div class="tb-field"><label>Category</label>' +
+          '<select id="trv-f-category">' +
+            CATEGORIES.map(c => '<option value="' + c.key + '"' + ((trip ? trip.category : 'travel') === c.key ? ' selected' : '') + '>' + escapeHtml(c.label) + '</option>').join('') +
+          '</select></div>' +
           '<div class="tb-field"><div class="tb-checkbox-row" style="margin-top:22px;">' +
             '<input type="checkbox" id="trv-f-approx"' + (trip && trip.approx ? ' checked' : '') + '>' +
             '<label for="trv-f-approx">Dates are estimated</label></div></div>' +
@@ -3378,6 +3386,7 @@
     const start = document.getElementById('trv-f-start').value;
     const end = document.getElementById('trv-f-end').value || start;
     const status = document.getElementById('trv-f-status').value;
+    const category = document.getElementById('trv-f-category').value;
     const approx = document.getElementById('trv-f-approx').checked;
     const notes = document.getElementById('trv-f-notes').value.trim();
 
@@ -3385,12 +3394,12 @@
 
     if (editingId) {
       const t = trips.find(t => t.id === editingId);
-      Object.assign(t, { destination: dest, start, end, status, approx, notes });
+      Object.assign(t, { destination: dest, start, end, status, category, approx, notes });
     } else {
       trips.push({
         id: 'trip-' + Date.now(),
         destination: dest, start, end, status, approx, notes,
-        kind: status === 'break' ? 'closure' : 'trip', category: 'travel',
+        kind: status === 'break' ? 'closure' : 'trip', category,
         sections: [], itinSource: ''
       });
     }
