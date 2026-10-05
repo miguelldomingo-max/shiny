@@ -113,6 +113,10 @@
     --sage-dim: #567065;
     --ink: #eef3ee;
     --danger: #c9694f;
+    --rose: #d98fa3;
+    --rose-dim: #9c6672;
+    --sky: #7fa8d9;
+    --sky-dim: #56748f;
     font-family: 'IBM Plex Sans', -apple-system, sans-serif;
     background: var(--bg);
     color: var(--ink);
@@ -180,6 +184,8 @@
   }
   .tb-filter-btn:hover { color: var(--sage); }
   .tb-filter-btn.active { border-color: var(--amber-dim); color: var(--amber); }
+  .tb-filter-btn[data-catfilter="kids"].active { border-color: var(--rose-dim); color: var(--rose); }
+  .tb-filter-btn[data-catfilter="school"].active { border-color: var(--sky-dim); color: var(--sky); }
   .tb-schooltag {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 10px;
@@ -544,18 +550,21 @@
   }
   .tb-days {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 22px;
+    font-size: 14px;
     font-weight: 600;
     color: var(--amber);
-    min-width: 52px;
+    min-width: 78px;
     text-align: right;
-    line-height: 1;
+    line-height: 1.3;
   }
-  .tb-days.past { color: var(--sage-dim); }
+  .tb-days.cat-travel { color: var(--amber); }
+  .tb-days.cat-kids { color: var(--rose); }
+  .tb-days.cat-school { color: var(--sky); }
+  .tb-days.past { color: var(--sage-dim) !important; }
   .tb-row.is-break .tb-days,
   .tb-row.is-break .tb-days-unit,
   .tb-row.is-break .tb-dest,
-  .tb-row.is-break .tb-dates { color: var(--sage-dim); }
+  .tb-row.is-break .tb-dates { color: var(--sage-dim) !important; }
   .tb-days-unit {
     display: block;
     font-size: 9px;
@@ -565,6 +574,9 @@
     font-weight: 400;
     text-align: right;
   }
+  .tb-days-unit.cat-travel { color: var(--amber-dim); }
+  .tb-days-unit.cat-kids { color: var(--rose-dim); }
+  .tb-days-unit.cat-school { color: var(--sky-dim); }
   .tb-main { flex: 1; min-width: 0; }
   .tb-dest {
     font-size: 17px;
@@ -2537,6 +2549,10 @@
     return str.toUpperCase();
   }
 
+  function weekdayAbbr(dateStr) {
+    return parseDate(dateStr).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+  }
+
   function daysUntil(start, end) {
     const s = parseDate(start), e = parseDate(end);
     const msPerDay = 86400000;
@@ -2888,21 +2904,21 @@
     const row = document.createElement('div');
     row.className = 'tb-row' + (trip.status === 'break' ? ' is-break' : '');
 
-    let dayLabel, dayUnit;
-    if (d.state === 'now') { dayLabel = 'NOW'; dayUnit = 'traveling'; }
-    else if (d.state === 'past') { dayLabel = d.n; dayUnit = 'days ago'; }
-    else { dayLabel = d.n; dayUnit = d.n === 1 ? 'day out' : 'days out'; }
+    let daysText;
+    if (d.state === 'now') { daysText = 'Happening now'; }
+    else if (d.state === 'past') { daysText = d.n + ' day' + (d.n === 1 ? '' : 's') + ' ago'; }
+    else { daysText = d.n + ' day' + (d.n === 1 ? '' : 's') + ' out'; }
 
     const STATUS_LABELS = { researching: 'Researching', planning: 'Planning', confirmed: 'Confirmed', break: 'School break' };
     const statusLabel = STATUS_LABELS[trip.status] || (trip.status.charAt(0).toUpperCase() + trip.status.slice(1));
 
     row.innerHTML =
       '<div class="tb-row-top">' +
-        '<div class="tb-days ' + (d.state === 'past' ? 'past' : '') + '">' + dayLabel + '<span class="tb-days-unit">' + dayUnit + '</span></div>' +
+        '<div class="tb-days cat-' + trip.category + (d.state === 'past' ? ' past' : '') + '">' + fmtRange(trip.start, trip.end) + '<span class="tb-days-unit cat-' + trip.category + '">' + weekdayAbbr(trip.start) + '</span></div>' +
         '<div class="tb-main">' +
           '<div class="tb-dest">' + escapeHtml(trip.destination) + '</div>' +
           '<div class="tb-meta">' +
-            '<span class="tb-dates">' + fmtRange(trip.start, trip.end) + '</span>' +
+            '<span class="tb-dates">' + daysText + '</span>' +
             (trip.approx ? '<span class="tb-approx">est.</span>' : '') +
           '</div>' +
         '</div>' +
