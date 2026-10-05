@@ -862,7 +862,7 @@
     <button class="hub-tab active" data-hubview="home">Home</button>
     <button class="hub-tab" data-hubview="school">Private School Applications</button>
     <button class="hub-tab" data-hubview="household">Household To-Dos</button>
-    <button class="hub-tab" data-hubview="travel">Travel Tracker</button>
+    <button class="hub-tab" data-hubview="travel">Calendar</button>
     <button class="hub-tab" data-hubview="settings">Settings</button>
   </div>
 
@@ -884,10 +884,10 @@
     </div>
     <div class="pq-card">
       <div class="pq-card-head">
-        <div class="pq-card-title">✈️ Travel Tracker</div>
+        <div class="pq-card-title">📅 Calendar</div>
         <button class="pq-link-btn home-nav-btn" data-goto="travel" style="cursor:pointer;">Open →</button>
       </div>
-      <div class="tb-detail-inner" style="padding-left:0;">Atlanta + Savannah (Oct), Hoodsport cabin (Nov), SoCal Thanksgiving (Nov), Whistler (Dec/New Year's), lined up against Mika's school breaks.</div>
+      <div class="tb-detail-inner" style="padding-left:0;">Trips, school dates, and family events all in one place — filter to show just what you need.</div>
     </div>
   </div>
 
@@ -944,9 +944,10 @@
 
   <div id="view-travel" class="hub-view">
     <div class="tb-head">
-      <div class="hub-section-label">TRAVEL TRACKER</div>
+      <div class="hub-section-label">CALENDAR</div>
       <button class="tb-add-btn" id="trv-add-toggle">+ Add trip</button>
     </div>
+    <div id="trv-filterbar" class="tb-filterbar"></div>
     <div id="trv-form-slot"></div>
     <div id="trv-list"></div>
     <div class="tb-foot">shared board — anyone with the link can view and edit</div>
@@ -2451,8 +2452,18 @@
   const listEl = document.getElementById('trv-list');
   const formSlot = document.getElementById('trv-form-slot');
   const addToggle = document.getElementById('trv-add-toggle');
+  const filterbarEl = document.getElementById('trv-filterbar');
 
   const SEED = [];
+
+  const CATEGORIES = [
+    { key: 'travel', label: 'Travel' },
+    { key: 'kids', label: 'Kids' },
+    { key: 'school', label: 'School' },
+  ];
+  // Everything shown by default -- the filter bar lets you narrow it down,
+  // not opt back in.
+  let activeCategories = new Set(CATEGORIES.map(c => c.key));
 
   let trips = [];
   let editingId = null;
@@ -2930,18 +2941,33 @@
     return map;
   }
 
+  function buildFilterBar() {
+    const present = new Set(trips.map(t => t.category).filter(Boolean));
+    filterbarEl.innerHTML = CATEGORIES
+      .filter(c => present.has(c.key))
+      .map(c => '<button class="tb-filter-btn' + (activeCategories.has(c.key) ? ' active' : '') + '" data-catfilter="' + c.key + '">' + escapeHtml(c.label) + '</button>')
+      .join('');
+    filterbarEl.querySelectorAll('[data-catfilter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.getAttribute('data-catfilter');
+        if (activeCategories.has(key)) activeCategories.delete(key);
+        else activeCategories.add(key);
+        render();
+      });
+    });
+  }
+
   function render() {
-    // trips holds the full shared Event array (now also storing the School
-    // Applications board's items) -- this tab only ever displays the
-    // non-school subset, but keeps the whole array in memory so save()
+    // trips holds the full shared Event array (also storing the School
+    // Applications board's items) -- this tab shows all of it, scoped down
+    // by activeCategories, and keeps the whole array in memory so save()
     // never drops items that belong to the other tab.
-    // category:"school" closures (school breaks) were always shown here
-    // too (shaded), even before the two boards were merged -- only the
-    // non-closure school items (deadlines/events) belong solely to the
-    // School Applications tab.
-    const sorted = sortTrips(trips.filter(t => t.category !== 'school' || t.kind === 'closure'));
+    buildFilterBar();
+    const sorted = sortTrips(trips.filter(t => activeCategories.has(t.category)));
     if (sorted.length === 0) {
-      listEl.innerHTML = '<div class="tb-empty">Nothing here yet.<br>Add a trip to start tracking it.</div>';
+      listEl.innerHTML = trips.length === 0
+        ? '<div class="tb-empty">Nothing here yet.<br>Add a trip to start tracking it.</div>'
+        : '<div class="tb-empty">No events match the current filter.<br>Pick another category above.</div>';
       return;
     }
     listEl.innerHTML = '';
