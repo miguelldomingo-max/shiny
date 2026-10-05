@@ -117,6 +117,10 @@
     --rose-dim: #9c6672;
     --sky: #7fa8d9;
     --sky-dim: #56748f;
+    --gold: #d4b94e;
+    --gold-dim: #9c8a3c;
+    --lavender: #b49bd9;
+    --lavender-dim: #7d6b96;
     font-family: 'IBM Plex Sans', -apple-system, sans-serif;
     background: var(--bg);
     color: var(--ink);
@@ -162,6 +166,27 @@
     transition: border-color .15s, color .15s;
   }
   .tb-add-btn:hover { border-color: var(--amber); color: var(--amber); }
+  .tb-add-btn.active { border-color: var(--amber); color: var(--amber); background: rgba(232, 163, 61, 0.1); }
+  .tb-head-actions { display: flex; gap: 8px; }
+  .tb-week-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    color: var(--sage);
+    font-weight: 600;
+    margin: 18px 0 4px;
+    padding-bottom: 6px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .tb-week-label:first-child { margin-top: 0; }
+  .tb-week-empty {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--sage-dim);
+    padding: 10px 2px;
+    font-style: italic;
+  }
 
   .tb-filterbar {
     display: flex;
@@ -186,6 +211,8 @@
   .tb-filter-btn.active { border-color: var(--amber-dim); color: var(--amber); }
   .tb-filter-btn[data-catfilter="kids"].active { border-color: var(--rose-dim); color: var(--rose); }
   .tb-filter-btn[data-catfilter="school"].active { border-color: var(--sky-dim); color: var(--sky); }
+  .tb-filter-btn[data-catfilter="finance"].active { border-color: var(--gold-dim); color: var(--gold); }
+  .tb-filter-btn[data-catfilter="personal"].active { border-color: var(--lavender-dim); color: var(--lavender); }
   .tb-schooltag {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 10px;
@@ -560,6 +587,8 @@
   .tb-days.cat-travel { color: var(--amber); }
   .tb-days.cat-kids { color: var(--rose); }
   .tb-days.cat-school { color: var(--sky); }
+  .tb-days.cat-finance { color: var(--gold); }
+  .tb-days.cat-personal { color: var(--lavender); }
   .tb-days.past { color: var(--sage-dim) !important; }
   .tb-row.is-break .tb-days,
   .tb-row.is-break .tb-days-unit,
@@ -577,6 +606,8 @@
   .tb-days-unit.cat-travel { color: var(--amber-dim); }
   .tb-days-unit.cat-kids { color: var(--rose-dim); }
   .tb-days-unit.cat-school { color: var(--sky-dim); }
+  .tb-days-unit.cat-finance { color: var(--gold-dim); }
+  .tb-days-unit.cat-personal { color: var(--lavender-dim); }
   .tb-main { flex: 1; min-width: 0; }
   .tb-dest {
     font-size: 17px;
@@ -957,7 +988,10 @@
   <div id="view-travel" class="hub-view">
     <div class="tb-head">
       <div class="hub-section-label">CALENDAR</div>
-      <button class="tb-add-btn" id="trv-add-toggle">+ Add trip</button>
+      <div class="tb-head-actions">
+        <button class="tb-add-btn" id="trv-week-toggle">Week view</button>
+        <button class="tb-add-btn" id="trv-add-toggle">+ Add trip</button>
+      </div>
     </div>
     <div id="trv-filterbar" class="tb-filterbar"></div>
     <div id="trv-form-slot"></div>
@@ -2474,6 +2508,7 @@
   const formSlot = document.getElementById('trv-form-slot');
   const addToggle = document.getElementById('trv-add-toggle');
   const filterbarEl = document.getElementById('trv-filterbar');
+  const weekToggle = document.getElementById('trv-week-toggle');
 
   const SEED = [];
 
@@ -2481,10 +2516,13 @@
     { key: 'travel', label: 'Travel' },
     { key: 'kids', label: 'Kids' },
     { key: 'school', label: 'School' },
+    { key: 'finance', label: 'Finance' },
+    { key: 'personal', label: 'Personal' },
   ];
   // Everything shown by default -- the filter bar lets you narrow it down,
   // not opt back in.
   let activeCategories = new Set(CATEGORIES.map(c => c.key));
+  let weekViewOn = false;
 
   let trips = [];
   let editingId = null;
@@ -2551,6 +2589,42 @@
 
   function weekdayAbbr(dateStr) {
     return parseDate(dateStr).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+  }
+
+  function fmtISO(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function addDays(d, n) {
+    const out = new Date(d);
+    out.setDate(out.getDate() + n);
+    return out;
+  }
+
+  function startOfWeek(d) {
+    const out = new Date(d);
+    out.setHours(0, 0, 0, 0);
+    out.setDate(out.getDate() - out.getDay());
+    return out;
+  }
+
+  // A recurring:"yearly" item is stored with a single template start/end
+  // (the date it was first added), which would otherwise vanish into "past"
+  // forever once that date passes. At render time, shift it forward by
+  // whole years until it lands on the next occurrence at or after today --
+  // the stored record itself is never mutated, only this display copy.
+  function expandRecurring(list) {
+    return list.map(t => {
+      if (t.recurring !== 'yearly') return t;
+      const s = parseDate(t.start), e = parseDate(t.end);
+      let shift = 0;
+      while (new Date(e.getFullYear() + shift, e.getMonth(), e.getDate()) < today) shift++;
+      if (shift === 0) return t;
+      return Object.assign({}, t, {
+        start: fmtISO(new Date(s.getFullYear() + shift, s.getMonth(), s.getDate())),
+        end: fmtISO(new Date(e.getFullYear() + shift, e.getMonth(), e.getDate())),
+      });
+    });
   }
 
   function daysUntil(start, end) {
@@ -2899,7 +2973,8 @@
     window.location.href = mailto;
   }
 
-  function buildRow(trip) {
+  function buildRow(trip, instanceKey) {
+    const rowKey = instanceKey || trip.id;
     const d = daysUntil(trip.start, trip.end);
     const row = document.createElement('div');
     row.className = 'tb-row' + (trip.status === 'break' ? ' is-break' : '');
@@ -2924,7 +2999,7 @@
         '</div>' +
         '<div class="tb-status ' + trip.status + '">' + statusLabel + '</div>' +
       '</div>' +
-      '<div class="tb-detail' + (openDetail[trip.id] ? ' open' : '') + '" id="trv-detail-' + trip.id + '">' +
+      '<div class="tb-detail' + (openDetail[trip.id] ? ' open' : '') + '" id="trv-detail-' + rowKey + '">' +
         '<div class="tb-detail-inner">' +
           (trip.notes ? escapeHtml(trip.notes) : '<em style="color:var(--sage-dim)">No notes yet.</em>') +
           '<div class="tb-detail-actions">' +
@@ -2934,7 +3009,7 @@
             '<button class="tb-link-btn edit" data-pdf="' + trip.id + '">Export PDF</button>' +
             '<button class="tb-link-btn edit" data-email="' + trip.id + '">Email</button>' +
           '</div>' +
-          '<div id="hbh-slot-' + trip.id + '">' + (openHbh[trip.id] ? renderHbh(trip) : '') + '</div>' +
+          '<div id="hbh-slot-' + rowKey + '">' + (openHbh[trip.id] ? renderHbh(trip) : '') + '</div>' +
         '</div>' +
       '</div>';
 
@@ -2991,37 +3066,75 @@
     });
   }
 
+  // "so i can see weeks where nothing is going on" -- unlike the month
+  // view, this walks every week in the horizon (not just weeks that have
+  // something in them) and prints an explicit empty-week placeholder, so
+  // open stretches are visible instead of just absent.
+  function renderWeekView(list, sorted) {
+    const HORIZON_WEEKS = 16;
+    const firstWeekStart = startOfWeek(today);
+    for (let w = 0; w < HORIZON_WEEKS; w++) {
+      const weekStart = addDays(firstWeekStart, w * 7);
+      const weekEnd = addDays(weekStart, 6);
+
+      const label = document.createElement('div');
+      label.className = 'tb-week-label';
+      label.textContent = 'WEEK OF ' + fmtRange(fmtISO(weekStart), fmtISO(weekEnd));
+      list.appendChild(label);
+
+      const itemsThisWeek = sorted.filter(t => {
+        const s = parseDate(t.start), e = parseDate(t.end);
+        return s <= weekEnd && e >= weekStart;
+      });
+
+      if (itemsThisWeek.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'tb-week-empty';
+        empty.textContent = 'Nothing planned this week.';
+        list.appendChild(empty);
+      } else {
+        itemsThisWeek.forEach(t => list.appendChild(buildRow(t, t.id + '--w' + w)));
+      }
+    }
+  }
+
   function render() {
     // trips holds the full shared Event array (also storing the School
     // Applications board's items) -- this tab shows all of it, scoped down
     // by activeCategories, and keeps the whole array in memory so save()
     // never drops items that belong to the other tab.
     buildFilterBar();
-    const sorted = sortTrips(trips.filter(t => activeCategories.has(t.category)));
-    if (sorted.length === 0) {
-      listEl.innerHTML = trips.length === 0
-        ? '<div class="tb-empty">Nothing here yet.<br>Add a trip to start tracking it.</div>'
-        : '<div class="tb-empty">No events match the current filter.<br>Pick another category above.</div>';
+    const filtered = expandRecurring(trips.filter(t => activeCategories.has(t.category)));
+    const sorted = sortTrips(filtered);
+    if (trips.length === 0) {
+      listEl.innerHTML = '<div class="tb-empty">Nothing here yet.<br>Add a trip to start tracking it.</div>';
+      return;
+    }
+    if (sorted.length === 0 && !weekViewOn) {
+      listEl.innerHTML = '<div class="tb-empty">No events match the current filter.<br>Pick another category above.</div>';
       return;
     }
     listEl.innerHTML = '';
 
-    const byMonth = groupByMonth(sorted);
-    const monthKeys = Object.keys(byMonth).sort();
-
     const list = document.createElement('div');
     list.className = 'tb-flat-list';
 
-    monthKeys.forEach(key => {
-      const items = byMonth[key];
+    if (weekViewOn) {
+      renderWeekView(list, sorted);
+    } else {
+      const byMonth = groupByMonth(sorted);
+      const monthKeys = Object.keys(byMonth).sort();
+      monthKeys.forEach(key => {
+        const items = byMonth[key];
 
-      const label = document.createElement('div');
-      label.className = 'tb-month-label';
-      label.textContent = monthLabel(items[0].start);
-      list.appendChild(label);
+        const label = document.createElement('div');
+        label.className = 'tb-month-label';
+        label.textContent = monthLabel(items[0].start);
+        list.appendChild(label);
 
-      items.forEach(t => list.appendChild(buildRow(t)));
-    });
+        items.forEach(t => list.appendChild(buildRow(t)));
+      });
+    }
 
     listEl.appendChild(list);
 
@@ -3288,6 +3401,13 @@
 
   addToggle.addEventListener('click', () => {
     if (formOpen) { closeForm(); } else { openForm(null); }
+  });
+
+  weekToggle.addEventListener('click', () => {
+    weekViewOn = !weekViewOn;
+    weekToggle.classList.toggle('active', weekViewOn);
+    weekToggle.textContent = weekViewOn ? 'Month view' : 'Week view';
+    render();
   });
 
   window.addEventListener('hub:authenticated', load);
