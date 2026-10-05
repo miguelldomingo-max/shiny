@@ -1580,29 +1580,62 @@
 
 <script>
 (function() {
-  // This tab now reads/writes the same shared Event array as the Travel
-  // Tracker tab (listboard:travel-tracker) -- it just displays the
-  // category:"school" subset. Both tabs keep the FULL array in memory and
-  // write the whole thing back on save, so one tab's save never drops the
-  // other's items; real-time sync (see window.storage's channel
-  // subscription) keeps both tabs' in-memory copies fresh after either
-  // one writes.
+  // ============================================================
+  // SHARED EVENT SCHEMA -- READ THIS BEFORE TOUCHING THE DATA
+  // ============================================================
+  // This tab, the Calendar tab, and (for todos only) the Household
+  // To-Dos tab all read/write the SAME two Supabase rows:
+  //   listboard:travel-tracker   (the unified Event array -- see shape below)
+  //   checklist:household-todos  (phases of Tasks; see that tab's own file for shape)
+  // Every tab keeps the FULL array/object in memory and writes the whole
+  // thing back on save (full replace, not a patch) -- a tab only ever
+  // *displays* a filtered subset, so saving from one tab must never drop
+  // another tab's items. Real-time sync (see window.storage's channel
+  // subscription in showApp()) keeps every open tab's in-memory copy
+  // fresh after any tab writes.
+  //
+  // Event shape:
+  //   { id, destination, start (YYYY-MM-DD), end (YYYY-MM-DD),
+  //     approx (bool), status ('researching'|'planning'|'confirmed'|'break'|
+  //       'applying'|'done'|'cancelled'|...freeform, used for badge + color),
+  //     kind ('trip'|'event'|'deadline'|'closure'),
+  //     category ('travel'|'kids'|'lakeridge'|'school'|'finance'|'personal'),
+  //     notes, sections (array of section objects, or [] if none built), itinSource,
+  //     linkedTo (optional: id of another Event this one relates to, e.g. a
+  //       school closure linked to the trip it overlaps),
+  //     recurring (optional: 'yearly'|'quarterly' -- see Calendar tab's
+  //       expandRecurring() for how this is projected forward at render
+  //       time; the stored start/end is just the template occurrence and is
+  //       never auto-advanced, only the Calendar tab's display copy is),
+  //     school, link }   <- school/link are School-Applications-only fields
+  //   Each section: { id, heading: "TUE 10/6", subheading: "Short section title",
+  //     items: [ { time, title, detail, mapQuery } ] }
+  //
+  // category meanings (also the Calendar tab's filter chips):
+  //   travel    - trips (flights/hotels/itineraries)
+  //   kids      - Mika-specific one-off events (birthday, a friend's party)
+  //   lakeridge - Mika's CURRENT school's own calendar: closures, no-school
+  //               days, conferences. NOT the admissions process.
+  //   school    - the PRIVATE SCHOOL APPLICATION process (EP/Overlake/Bush/
+  //               Lakeside) -- labeled "School Apps" in the Calendar UI.
+  //               This is the only category this tab (School Applications)
+  //               displays; see schoolTrips() below.
+  //   finance   - recurring money deadlines (e.g. credit card benefit resets)
+  //   personal  - misc family/social events not covered above (concerts, tea)
+  //
+  // Before writing a FULL REPLACE to either board via the Family Hub MCP
+  // tool: (1) re-fetch the live board first and diff against what you think
+  // is there -- the family may have edited live since your last read: see
+  // [[feedback_refetch_before_overwrite]] memory; (2) snapshot the current
+  // board JSON to backups/ (gitignored) before writing, per the project's
+  // own backup convention; (3) after writing, re-fetch to confirm the write
+  // landed as expected.
   const STORAGE_KEY = 'listboard:travel-tracker';
   const root = document.getElementById('hub-root');
   const listEl = document.getElementById('tb-list');
   const formSlot = document.getElementById('tb-form-slot');
   const addToggle = document.getElementById('tb-add-toggle');
   const todayEl = document.getElementById('tb-today');
-
-  // Item shape (shared with the Travel Tracker tab, see STORAGE_KEY above):
-  // { id, destination, start (YYYY-MM-DD), end (YYYY-MM-DD),
-  //   approx (bool), status ('researching'|'planning'|'confirmed'|'break'|'applying'|...),
-  //   kind ('trip'|'event'|'deadline'|'closure'), category ('school' for this tab's items),
-  //   notes, sections (array of section objects, or [] if none built), itinSource,
-  //   school, link }   <- school/link are school-item-only fields
-  // Each section: { id, heading: "TUE 10/6", subheading: "Short section title",
-  //   items: [ { time, title, detail, mapQuery } ] }
-  // status 'break' marks the right-hand "TASKS & KEY DATES" column.
 
   const SEED = [];
 
@@ -2612,21 +2645,24 @@
     return out;
   }
 
-  // A recurring:"yearly" item is stored with a single template start/end
-  // (the date it was first added), which would otherwise vanish into "past"
-  // forever once that date passes. At render time, shift it forward by
-  // whole years until it lands on the next occurrence at or after today --
+  // A recurring item is stored with a single template start/end (the date
+  // it was first added), which would otherwise vanish into "past" forever
+  // once that date passes. At render time, shift it forward by whole
+  // intervals until it lands on the next occurrence at or after today --
   // the stored record itself is never mutated, only this display copy.
+  const RECUR_MONTHS = { yearly: 12, quarterly: 3 };
   function expandRecurring(list) {
     return list.map(t => {
-      if (t.recurring !== 'yearly') return t;
+      const stepMonths = RECUR_MONTHS[t.recurring];
+      if (!stepMonths) return t;
       const s = parseDate(t.start), e = parseDate(t.end);
-      let shift = 0;
-      while (new Date(e.getFullYear() + shift, e.getMonth(), e.getDate()) < today) shift++;
-      if (shift === 0) return t;
+      let steps = 0;
+      const shifted = (d, n) => new Date(d.getFullYear(), d.getMonth() + stepMonths * n, d.getDate());
+      while (shifted(e, steps) < today) steps++;
+      if (steps === 0) return t;
       return Object.assign({}, t, {
-        start: fmtISO(new Date(s.getFullYear() + shift, s.getMonth(), s.getDate())),
-        end: fmtISO(new Date(e.getFullYear() + shift, e.getMonth(), e.getDate())),
+        start: fmtISO(shifted(s, steps)),
+        end: fmtISO(shifted(e, steps)),
       });
     });
   }
