@@ -1737,6 +1737,15 @@
       const k = monthKey(t.start);
       (map[k] = map[k] || []).push(t);
     });
+    // sortTrips ranks now/future/past across the whole list so upcoming
+    // stuff floats to the top overall -- but that means a same-month item
+    // that's already past (e.g. an Oct 2 deadline) gets pushed behind
+    // every future item from every month, landing at the end of its own
+    // month's bucket instead of in calendar order. Re-sort each bucket by
+    // actual date so a month's contents always read top-to-bottom.
+    Object.keys(map).forEach(k => {
+      map[k].sort((a, b) => parseDate(a.start) - parseDate(b.start));
+    });
     return map;
   }
 
@@ -2937,6 +2946,15 @@
     list.forEach(t => {
       const k = monthKey(t.start);
       (map[k] = map[k] || []).push(t);
+    });
+    // sortTrips ranks now/future/past across the whole list so upcoming
+    // stuff floats to the top overall -- but that means a same-month item
+    // that's already past (e.g. an Oct 2 deadline) gets pushed behind
+    // every future item from every month, landing at the end of its own
+    // month's bucket instead of in calendar order. Re-sort each bucket by
+    // actual date so a month's contents always read top-to-bottom.
+    Object.keys(map).forEach(k => {
+      map[k].sort((a, b) => parseDate(a.start) - parseDate(b.start));
     });
     return map;
   }
