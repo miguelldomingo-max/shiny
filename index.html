@@ -595,6 +595,8 @@
   .tb-status.planning { color: var(--sage); border-color: var(--sage-dim); }
   .tb-status.researching { color: var(--sage-dim); }
   .tb-status.break { color: var(--sage-dim); border-style: dashed; font-style: italic; }
+  .tb-status.done { color: var(--sage-dim); text-decoration: line-through; }
+  .tb-status.cancelled { color: var(--danger); opacity: 0.75; text-decoration: line-through; }
 
   .tb-detail {
     max-height: 0;
@@ -721,12 +723,6 @@
     cursor: pointer;
   }
   .tb-stop-title-row .tb-stop-title { flex: 1; }
-  .tb-stop-todocount {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    color: var(--sage-dim);
-    flex-shrink: 0;
-  }
   .tb-stop-chevron {
     font-size: 13px;
     color: var(--sage-dim);
@@ -738,62 +734,6 @@
     margin-top: 8px;
     display: flex;
     gap: 14px;
-  }
-  .tb-todos {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px dashed var(--line);
-  }
-  .tb-todos-empty {
-    font-size: 11.5px;
-    color: var(--sage-dim);
-    font-style: italic;
-  }
-  .tb-todos-empty-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-  }
-  .tb-todo-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 0;
-  }
-  .tb-todo-text {
-    flex: 1;
-    font-size: 12.5px;
-    color: var(--ink);
-  }
-  .tb-todo-text.done {
-    color: var(--sage-dim);
-    text-decoration: line-through;
-  }
-  .tb-todo-edit-input {
-    flex: 1;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    color: var(--ink);
-    padding: 4px 6px;
-  }
-  .tb-todo-add-row {
-    display: flex;
-    gap: 8px;
-    margin-top: 6px;
-  }
-  .tb-todo-add-row input {
-    flex: 1;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    color: var(--ink);
-    padding: 5px 8px;
   }
 
   .tb-stop-map {
@@ -1588,22 +1528,29 @@
 
 <script>
 (function() {
-  const STORAGE_KEY = 'listboard:mika-private-school-apps';
+  // This tab now reads/writes the same shared Event array as the Travel
+  // Tracker tab (listboard:travel-tracker) -- it just displays the
+  // category:"school" subset. Both tabs keep the FULL array in memory and
+  // write the whole thing back on save, so one tab's save never drops the
+  // other's items; real-time sync (see window.storage's channel
+  // subscription) keeps both tabs' in-memory copies fresh after either
+  // one writes.
+  const STORAGE_KEY = 'listboard:travel-tracker';
   const root = document.getElementById('hub-root');
   const listEl = document.getElementById('tb-list');
   const formSlot = document.getElementById('tb-form-slot');
   const addToggle = document.getElementById('tb-add-toggle');
   const todayEl = document.getElementById('tb-today');
 
-  // EXAMPLE DATA — replace this with the user's actual trips/events.
-  // Each trip: { id, destination, start (YYYY-MM-DD), end (YYYY-MM-DD),
-  //   approx (bool, dates are estimated), status ('researching'|'planning'|'confirmed'|'break'),
-  //   notes (string), itinerary (array of day objects, or [] if none built yet), itinSource (string, or "") }
-  // Each itinerary day: { day: "TUE 10/6", label: "Short day title",
-  //   stops: [ { time: "3:55 PM", title: "Depart SEA", detail: "optional extra info" }, ... ] }
-  // Use status 'break' for the right-hand column (school breaks, blackout dates, etc.) —
-  // rename "MIKA'S SCHOOL BREAKS" in the column header below to whatever fits the user's second category,
-  // or delete the two-column split entirely for a single-column list if there's no second category.
+  // Item shape (shared with the Travel Tracker tab, see STORAGE_KEY above):
+  // { id, destination, start (YYYY-MM-DD), end (YYYY-MM-DD),
+  //   approx (bool), status ('researching'|'planning'|'confirmed'|'break'|'applying'|...),
+  //   kind ('trip'|'event'|'deadline'|'closure'), category ('school' for this tab's items),
+  //   notes, sections (array of section objects, or [] if none built), itinSource,
+  //   school, link }   <- school/link are school-item-only fields
+  // Each section: { id, heading: "TUE 10/6", subheading: "Short section title",
+  //   items: [ { time, title, detail, mapQuery } ] }
+  // status 'break' marks the right-hand "TASKS & KEY DATES" column.
 
   const SEED = [];
 
@@ -1699,26 +1646,26 @@
   }
 
   function renderHbh(trip) {
-    const itin = trip.itinerary || [];
-    if (itin.length === 0) {
+    const sections = trip.sections || [];
+    if (sections.length === 0) {
       return '<div class="tb-hbh"><div class="tb-hbh-empty">No requirements breakdown yet.</div></div>';
     }
     if (openDayIndex[trip.id] === undefined) openDayIndex[trip.id] = 0;
     const activeIdx = openDayIndex[trip.id];
-    const active = itin[activeIdx];
+    const active = sections[activeIdx];
 
-    const tabs = itin.map((d, i) => (
-      '<button class="tb-daytab' + (i === activeIdx ? ' active' : '') + '" data-daytab="' + trip.id + '::' + i + '">' + d.day + '</button>'
+    const tabs = sections.map((d, i) => (
+      '<button class="tb-daytab' + (i === activeIdx ? ' active' : '') + '" data-daytab="' + trip.id + '::' + i + '">' + d.heading + '</button>'
     )).join('');
 
-    const stops = active.stops.map(s => (
+    const stops = active.items.map(s => (
       '<div class="tb-stop"><div class="tb-stop-time">' + escapeHtml(s.time) + '</div><div class="tb-stop-body"><div class="tb-stop-title">' + escapeHtml(s.title) + '</div>' +
       (s.detail ? '<div class="tb-stop-detail">' + escapeHtml(s.detail) + '</div>' : '') + '</div></div>'
     )).join('');
 
     return '<div class="tb-hbh">' +
       '<div class="tb-daytabs">' + tabs + '</div>' +
-      '<div class="tb-daylabel">' + escapeHtml(active.day) + ' \u2014 ' + escapeHtml(active.label) + '</div>' +
+      '<div class="tb-daylabel">' + escapeHtml(active.heading) + (active.subheading ? ' \u2014 ' + escapeHtml(active.subheading) : '') + '</div>' +
       stops +
       (trip.itinSource ? '<div class="tb-hbh-source">' + escapeHtml(trip.itinSource) + '</div>' : '') +
       '</div>';
@@ -1736,7 +1683,7 @@
 
     const STATUS_LABELS = { researching: 'Researching', planning: 'Drafting', confirmed: 'Submitted', break: 'Task / Date' };
     const statusLabel = STATUS_LABELS[trip.status] || (trip.status.charAt(0).toUpperCase() + trip.status.slice(1));
-    const hasItin = trip.itinerary && trip.itinerary.length > 0;
+    const hasItin = trip.sections && trip.sections.length > 0;
 
     row.innerHTML =
       '<div class="tb-row-top">' +
@@ -1792,8 +1739,20 @@
     return map;
   }
 
+  function schoolTrips() {
+    // trips holds the full shared Event array (now also storing the Travel
+    // Tracker's items) -- this tab only ever displays the category:"school"
+    // subset, but keeps the whole array in memory so save() never drops
+    // items that belong to the other tab.
+    // Closures (category:"school", kind:"closure") were never part of this
+    // board's original 11 items -- they lived only in the travel tracker,
+    // just shaded. Exclude them here so this tab's contents match exactly
+    // what it showed before the two boards were merged.
+    return trips.filter(t => t.category === 'school' && t.kind !== 'closure');
+  }
+
   function buildFilterBar() {
-    const present = new Set(trips.map(t => t.school).filter(Boolean));
+    const present = new Set(schoolTrips().map(t => t.school).filter(Boolean));
     filterbarEl.innerHTML = SCHOOLS
       .filter(s => s.key === 'all' || present.has(s.key))
       .map(s => '<button class="tb-filter-btn' + (activeFilter === s.key ? ' active' : '') + '" data-filter="' + s.key + '">' + escapeHtml(s.label) + '</button>')
@@ -1808,7 +1767,8 @@
 
   function render() {
     buildFilterBar();
-    const visible = activeFilter === 'all' ? trips : trips.filter(t => t.school === activeFilter);
+    const scoped = schoolTrips();
+    const visible = activeFilter === 'all' ? scoped : scoped.filter(t => t.school === activeFilter);
     const sorted = sortTrips(visible);
     if (sorted.length === 0) {
       listEl.innerHTML = '<div class="tb-empty">Nothing here yet.<br>Add an item to start tracking it.</div>';
@@ -1816,8 +1776,13 @@
     }
     listEl.innerHTML = '';
 
-    const tripList = sorted.filter(t => t.status !== 'break');
-    const breakList = sorted.filter(t => t.status === 'break');
+    // This split used to key off status==='break' as a proxy for "one-off
+    // task, not an application" -- now that status holds a real value for
+    // these items (so they can actually be marked done), kind is the
+    // correct signal: kind:"event" is a one-off task/date, everything
+    // else (the actual school application entries) goes on the left.
+    const tripList = sorted.filter(t => t.kind !== 'event');
+    const breakList = sorted.filter(t => t.kind === 'event');
     const tripsByMonth = groupByMonth(tripList);
     const breaksByMonth = groupByMonth(breakList);
     const monthKeys = Array.from(new Set([...Object.keys(tripsByMonth), ...Object.keys(breaksByMonth)])).sort();
@@ -1938,6 +1903,8 @@
             '<option value="planning"' + (trip && trip.status === 'planning' ? ' selected' : '') + '>Drafting</option>' +
             '<option value="confirmed"' + (trip && trip.status === 'confirmed' ? ' selected' : '') + '>Submitted</option>' +
             '<option value="break"' + (trip && trip.status === 'break' ? ' selected' : '') + '>Task / Date</option>' +
+            '<option value="done"' + (trip && trip.status === 'done' ? ' selected' : '') + '>Done</option>' +
+            '<option value="cancelled"' + (trip && trip.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option>' +
           '</select></div>' +
           '<div class="tb-field"><label>School</label>' +
           '<select id="f-school">' +
@@ -1991,7 +1958,8 @@
       trips.push({
         id: 'trip-' + Date.now(),
         destination: dest, start, end, status, school, approx, link, notes,
-        itinerary: [], itinSource: ''
+        category: 'school', kind: status === 'break' ? 'event' : 'deadline',
+        sections: [], itinSource: ''
       });
     }
     await save();
@@ -2495,33 +2463,22 @@
   const openStops = {};       // stopKey -> bool, whether a stop's detail/to-dos are expanded
   const openAddDay = {};      // tripId -> bool, whether the "+ Add day" form is expanded
   const openAddStop = {};     // dayKey (tripId::dayIdx) -> bool, whether "+ Add stop" form is expanded
-  const openTodoAdd = {};     // stopKey -> bool, whether the "+ Add" to-do input is expanded
   const openStopMap = {};     // stopKey -> bool, whether that stop's auto map is expanded
   let editingStop = null;     // stopKey currently being edited, or null
-  let editingTodo = null;     // todoKey currently being edited, or null
 
   const today = new Date();
   today.setHours(0,0,0,0);
 
-  function stopKey(tripId, dayIdx, si) { return tripId + '::' + dayIdx + '::' + si; }
+  function stopKey(tripId, sectionIdx, si) { return tripId + '::' + sectionIdx + '::' + si; }
 
   function findStop(sKey) {
     const parts = sKey.split('::');
     const si = parseInt(parts.pop(), 10);
-    const dayIdx = parseInt(parts.pop(), 10);
+    const sectionIdx = parseInt(parts.pop(), 10);
     const tripId = parts.join('::');
     const trip = trips.find(t => t.id === tripId);
-    const day = trip && (trip.itinerary || [])[dayIdx];
-    return day ? (day.stops[si] || null) : null;
-  }
-
-  function findTodo(tKey) {
-    const parts = tKey.split('::');
-    const ti = parseInt(parts.pop(), 10);
-    const stop = findStop(parts.join('::'));
-    if (!stop) return null;
-    stop.todos = stop.todos || [];
-    return stop.todos[ti] || null;
+    const section = trip && (trip.sections || [])[sectionIdx];
+    return section ? (section.items[si] || null) : null;
   }
 
   function openDeepLinkedTrip() {
@@ -2608,49 +2565,6 @@
     return div.innerHTML;
   }
 
-  function renderTodos(sKey, todos) {
-    const rows = todos.map((t, ti) => {
-      const tKey = sKey + '::' + ti;
-      if (editingTodo === tKey) {
-        return '<div class="tb-todo-row">' +
-          '<input type="text" class="tb-todo-edit-input" data-todo-edit-input="' + tKey + '" value="' + escapeHtml(t.text) + '">' +
-          '<button class="tb-link-btn edit" data-todo-save="' + tKey + '">Save</button>' +
-          '<button class="tb-link-btn del" data-todo-cancel="' + tKey + '">Cancel</button>' +
-        '</div>';
-      }
-      return '<div class="tb-todo-row">' +
-        '<input type="checkbox" ' + (t.done ? 'checked' : '') + ' data-todo-toggle="' + tKey + '">' +
-        '<span class="tb-todo-text' + (t.done ? ' done' : '') + '">' + escapeHtml(t.text) + '</span>' +
-        '<button class="tb-link-btn edit" data-todo-edit="' + tKey + '">Edit</button>' +
-        '<button class="tb-link-btn del" data-todo-del="' + tKey + '">✕</button>' +
-      '</div>';
-    }).join('');
-
-    const addOpen = !!openTodoAdd[sKey];
-    const addRow = !addOpen ? '' :
-      '<div class="tb-todo-add-row">' +
-        '<input type="text" placeholder="Add a to-do..." data-todo-newinput="' + sKey + '">' +
-        '<button class="tb-link-btn edit" data-todo-addbtn="' + sKey + '">+ Add</button>' +
-        '<button class="tb-link-btn del" data-todo-addcancel="' + sKey + '">Cancel</button>' +
-      '</div>';
-
-    if (!rows) {
-      return '<div class="tb-todos">' +
-        '<div class="tb-todos-empty-row">' +
-          '<div class="tb-todos-empty">No to-dos yet.</div>' +
-          (!addOpen ? '<button class="tb-link-btn edit" data-todo-addtoggle="' + sKey + '">+ Add</button>' : '') +
-        '</div>' +
-        addRow +
-      '</div>';
-    }
-
-    return '<div class="tb-todos">' +
-      rows +
-      (!addOpen ? '<div class="tb-hbh-toggle-row"><button class="tb-link-btn edit" data-todo-addtoggle="' + sKey + '">+ Add</button></div>' : '') +
-      addRow +
-    '</div>';
-  }
-
   // Auto-derived, no manual link entry: search Google Maps for the stop's
   // own title (stripping a "Dinner:"/"Lunch:" style label prefix) plus the
   // trip's destination for disambiguation. The plain q=...&output=embed
@@ -2678,7 +2592,7 @@
   }
 
   function renderHbh(trip) {
-    const itin = trip.itinerary || [];
+    const sections = trip.sections || [];
     const addDayOpen = !!openAddDay[trip.id];
     const addDayToggle = '<div class="tb-hbh-toggle-row">' +
       '<button class="tb-link-btn edit" data-toggle-addday="' + trip.id + '">' + (addDayOpen ? 'Cancel' : '+ Add day') + '</button>' +
@@ -2694,24 +2608,24 @@
         '</div>' +
       '</div>';
 
-    if (itin.length === 0) {
+    if (sections.length === 0) {
       return '<div class="tb-hbh">' +
         '<div class="tb-hbh-empty">No hour-by-hour built for this trip yet.</div>' +
         addDayToggle + addDayForm +
       '</div>';
     }
 
-    const activeIdx = Math.min(openDayIndex[trip.id] || 0, itin.length - 1);
+    const activeIdx = Math.min(openDayIndex[trip.id] || 0, sections.length - 1);
     openDayIndex[trip.id] = activeIdx;
-    const active = itin[activeIdx];
+    const active = sections[activeIdx];
     const dayKey = trip.id + '::' + activeIdx;
     const addStopOpen = !!openAddStop[dayKey];
 
-    const tabs = itin.map((d, i) => (
-      '<button class="tb-daytab' + (i === activeIdx ? ' active' : '') + '" data-daytab="' + trip.id + '::' + i + '">' + escapeHtml(d.day) + '</button>'
+    const tabs = sections.map((d, i) => (
+      '<button class="tb-daytab' + (i === activeIdx ? ' active' : '') + '" data-daytab="' + trip.id + '::' + i + '">' + escapeHtml(d.heading) + '</button>'
     )).join('');
 
-    const stops = active.stops.map((s, si) => {
+    const stops = active.items.map((s, si) => {
       const sKey = stopKey(trip.id, activeIdx, si);
 
       if (editingStop === sKey) {
@@ -2731,8 +2645,6 @@
         '</div>';
       }
 
-      const todos = s.todos || [];
-      const doneCount = todos.filter(t => t.done).length;
       const isOpen = !!openStops[sKey];
 
       return '<div class="tb-stop">' +
@@ -2740,7 +2652,6 @@
         '<div class="tb-stop-body">' +
           '<div class="tb-stop-title-row" data-stop-toggle="' + sKey + '">' +
             '<div class="tb-stop-title">' + escapeHtml(s.title) + '</div>' +
-            (todos.length ? '<span class="tb-stop-todocount">' + doneCount + '/' + todos.length + '</span>' : '') +
             '<span class="tb-stop-chevron' + (isOpen ? ' open' : '') + '">›</span>' +
           '</div>' +
           (isOpen ? (
@@ -2749,8 +2660,7 @@
               '<button class="tb-link-btn edit" data-edit-stop="' + sKey + '">Edit</button>' +
               '<button class="tb-link-btn del" data-del-stop="' + sKey + '">Remove</button>' +
             '</div>' +
-            renderStopMap(sKey, s, trip) +
-            renderTodos(sKey, todos)
+            renderStopMap(sKey, s, trip)
           ) : '') +
         '</div>' +
       '</div>';
@@ -2774,7 +2684,7 @@
     return '<div class="tb-hbh">' +
       '<div class="tb-daytabs">' + tabs + '</div>' +
       '<div class="tb-daylabel-row" style="display:flex;justify-content:space-between;align-items:baseline;">' +
-        '<div class="tb-daylabel">' + escapeHtml(active.day) + ' — ' + escapeHtml(active.label) + '</div>' +
+        '<div class="tb-daylabel">' + escapeHtml(active.heading) + (active.subheading ? ' — ' + escapeHtml(active.subheading) : '') + '</div>' +
         '<button class="tb-link-btn del" data-del-day="' + trip.id + '::' + activeIdx + '">Remove day</button>' +
       '</div>' +
       (stops || '<div class="tb-hbh-empty">No stops yet.</div>') +
@@ -2801,13 +2711,10 @@
       trip.maps.forEach(m => lines.push('Map (' + m.label + '): ' + m.url));
       lines.push('');
     }
-    (trip.itinerary || []).forEach(day => {
-      lines.push(day.day + (day.label ? ' — ' + day.label : ''));
-      (day.stops || []).forEach(s => {
+    (trip.sections || []).forEach(section => {
+      lines.push(section.heading + (section.subheading ? ' — ' + section.subheading : ''));
+      (section.items || []).forEach(s => {
         lines.push('  ' + s.time + '  ' + s.title + (s.detail ? ' — ' + s.detail : ''));
-        (s.todos || []).forEach(t => {
-          lines.push('    [' + (t.done ? 'x' : ' ') + '] ' + t.text);
-        });
       });
       lines.push('');
     });
@@ -2898,22 +2805,21 @@
       y += 3;
     }
 
-    (trip.itinerary || []).forEach(day => {
+    (trip.sections || []).forEach(section => {
       ensureSpace(15);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(13);
       doc.setTextColor(accent[0], accent[1], accent[2]);
-      doc.text(day.day + (day.label ? '  —  ' + day.label : ''), margin, y);
+      doc.text(section.heading + (section.subheading ? '  —  ' + section.subheading : ''), margin, y);
       y += 5;
       drawRule(accent, 0.5);
 
-      (day.stops || []).forEach(s => {
+      (section.items || []).forEach(s => {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9.5);
         const timeLines = doc.splitTextToSize(s.time || '—', timeColWidth);
         const detailLines = s.detail ? doc.splitTextToSize(s.detail, detailColWidth) : [];
-        const todos = s.todos || [];
-        const rightLineCount = 1 + detailLines.length + todos.length;
+        const rightLineCount = 1 + detailLines.length;
         const blockHeight = Math.max(rightLineCount * 5, timeLines.length * 5) + 4;
         ensureSpace(blockHeight);
 
@@ -2936,16 +2842,6 @@
           doc.setTextColor(muted[0], muted[1], muted[2]);
           detailLines.forEach(line => {
             doc.text(line, detailColX, y);
-            y += 4.8;
-          });
-        }
-
-        if (todos.length) {
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(9.5);
-          doc.setTextColor(ink[0], ink[1], ink[2]);
-          todos.forEach(t => {
-            doc.text((t.done ? '[x] ' : '[ ] ') + t.text, detailColX, y);
             y += 4.8;
           });
         }
@@ -3035,7 +2931,15 @@
   }
 
   function render() {
-    const sorted = sortTrips(trips);
+    // trips holds the full shared Event array (now also storing the School
+    // Applications board's items) -- this tab only ever displays the
+    // non-school subset, but keeps the whole array in memory so save()
+    // never drops items that belong to the other tab.
+    // category:"school" closures (school breaks) were always shown here
+    // too (shaded), even before the two boards were merged -- only the
+    // non-closure school items (deadlines/events) belong solely to the
+    // School Applications tab.
+    const sorted = sortTrips(trips.filter(t => t.category !== 'school' || t.kind === 'closure'));
     if (sorted.length === 0) {
       listEl.innerHTML = '<div class="tb-empty">Nothing here yet.<br>Add a trip to start tracking it.</div>';
       return;
@@ -3117,7 +3021,6 @@
         const [tripId, idx] = btn.getAttribute('data-daytab').split('::');
         openDayIndex[tripId] = parseInt(idx, 10);
         editingStop = null;
-        editingTodo = null;
         render();
       });
     });
@@ -3140,9 +3043,11 @@
         const dayTitle = panel.querySelector('[data-newday-title]').value.trim();
         if (!dayLabel) return;
         const trip = trips.find(t => t.id === tripId);
-        trip.itinerary = trip.itinerary || [];
-        trip.itinerary.push({ day: dayLabel, label: dayTitle, stops: [] });
-        openDayIndex[tripId] = trip.itinerary.length - 1;
+        trip.sections = trip.sections || [];
+        const section = { id: tripId + '-sec-' + trip.sections.length, heading: dayLabel, items: [] };
+        if (dayTitle) section.subheading = dayTitle;
+        trip.sections.push(section);
+        openDayIndex[tripId] = trip.sections.length - 1;
         openAddDay[tripId] = false;
         await save();
         render();
@@ -3154,7 +3059,7 @@
         e.stopPropagation();
         const [tripId, dayIdx] = btn.getAttribute('data-del-day').split('::');
         const trip = trips.find(t => t.id === tripId);
-        trip.itinerary.splice(parseInt(dayIdx, 10), 1);
+        trip.sections.splice(parseInt(dayIdx, 10), 1);
         openDayIndex[tripId] = 0;
         await save();
         render();
@@ -3180,7 +3085,7 @@
         const detail = panel.querySelector('[data-newstop-detail]').value.trim();
         if (!title) return;
         const trip = trips.find(t => t.id === tripId);
-        trip.itinerary[parseInt(dayIdx, 10)].stops.push({ time: time || '—', title, detail, todos: [] });
+        trip.sections[parseInt(dayIdx, 10)].items.push({ time: time || '—', title, detail });
         openAddStop[tripId + '::' + dayIdx] = false;
         await save();
         render();
@@ -3241,116 +3146,9 @@
         e.stopPropagation();
         const [tripId, dayIdx, stopIdx] = btn.getAttribute('data-del-stop').split('::');
         const trip = trips.find(t => t.id === tripId);
-        trip.itinerary[parseInt(dayIdx, 10)].stops.splice(parseInt(stopIdx, 10), 1);
+        trip.sections[parseInt(dayIdx, 10)].items.splice(parseInt(stopIdx, 10), 1);
         await save();
         render();
-      });
-    });
-
-    listEl.querySelectorAll('[data-todo-toggle]').forEach(el => {
-      el.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const todo = findTodo(el.getAttribute('data-todo-toggle'));
-        if (todo) {
-          todo.done = !todo.done;
-          await save();
-          render();
-        }
-      });
-    });
-
-    listEl.querySelectorAll('[data-todo-edit]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        editingTodo = btn.getAttribute('data-todo-edit');
-        render();
-      });
-    });
-
-    listEl.querySelectorAll('[data-todo-cancel]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        editingTodo = null;
-        render();
-      });
-    });
-
-    listEl.querySelectorAll('[data-todo-save]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const tKey = btn.getAttribute('data-todo-save');
-        const row = btn.closest('.tb-todo-row');
-        const todo = findTodo(tKey);
-        const input = row ? row.querySelector('[data-todo-edit-input]') : null;
-        if (todo && input) {
-          const text = input.value.trim();
-          if (text) {
-            todo.text = text;
-            editingTodo = null;
-            await save();
-          }
-        }
-        render();
-      });
-    });
-
-    listEl.querySelectorAll('[data-todo-del]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const parts = btn.getAttribute('data-todo-del').split('::');
-        const ti = parseInt(parts.pop(), 10);
-        const stop = findStop(parts.join('::'));
-        if (stop && stop.todos) {
-          stop.todos.splice(ti, 1);
-          await save();
-          render();
-        }
-      });
-    });
-
-    listEl.querySelectorAll('[data-todo-addtoggle]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openTodoAdd[btn.getAttribute('data-todo-addtoggle')] = true;
-        render();
-      });
-    });
-
-    listEl.querySelectorAll('[data-todo-addcancel]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openTodoAdd[btn.getAttribute('data-todo-addcancel')] = false;
-        render();
-      });
-    });
-
-    listEl.querySelectorAll('[data-todo-addbtn]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const sKey = btn.getAttribute('data-todo-addbtn');
-        const row = btn.closest('.tb-todo-add-row');
-        const input = row.querySelector('[data-todo-newinput]');
-        const text = input.value.trim();
-        if (!text) return;
-        const stop = findStop(sKey);
-        if (stop) {
-          stop.todos = stop.todos || [];
-          stop.todos.push({ text, done: false });
-          openTodoAdd[sKey] = false;
-          await save();
-          render();
-        }
-      });
-    });
-
-    listEl.querySelectorAll('[data-todo-newinput]').forEach(input => {
-      input.addEventListener('click', (e) => e.stopPropagation());
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          const sKey = input.getAttribute('data-todo-newinput');
-          listEl.querySelector('[data-todo-addbtn="' + sKey + '"]').click();
-        }
       });
     });
   }
@@ -3376,6 +3174,8 @@
             '<option value="planning"' + (trip && trip.status === 'planning' ? ' selected' : '') + '>Planning</option>' +
             '<option value="confirmed"' + (!trip || trip.status === 'confirmed' ? ' selected' : '') + '>Confirmed</option>' +
             '<option value="break"' + (trip && trip.status === 'break' ? ' selected' : '') + '>School break</option>' +
+            '<option value="done"' + (trip && trip.status === 'done' ? ' selected' : '') + '>Done</option>' +
+            '<option value="cancelled"' + (trip && trip.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option>' +
           '</select></div>' +
           '<div class="tb-field"><div class="tb-checkbox-row" style="margin-top:22px;">' +
             '<input type="checkbox" id="trv-f-approx"' + (trip && trip.approx ? ' checked' : '') + '>' +
@@ -3417,7 +3217,8 @@
       trips.push({
         id: 'trip-' + Date.now(),
         destination: dest, start, end, status, approx, notes,
-        itinerary: [], itinSource: ''
+        kind: status === 'break' ? 'closure' : 'trip', category: 'travel',
+        sections: [], itinSource: ''
       });
     }
     await save();
