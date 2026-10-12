@@ -1603,10 +1603,12 @@
   //     notes, sections (array of section objects, or [] if none built), itinSource,
   //     linkedTo (optional: id of another Event this one relates to, e.g. a
   //       school closure linked to the trip it overlaps),
-  //     recurring (optional: 'yearly'|'quarterly' -- see Calendar tab's
-  //       expandRecurring() for how this is projected forward at render
-  //       time; the stored start/end is just the template occurrence and is
-  //       never auto-advanced, only the Calendar tab's display copy is),
+  //     recurring (optional: 'yearly'|'semiannual'|'quarterly'|'monthly' --
+  //       see Calendar tab's expandRecurring() for how this is projected
+  //       forward at render time; the stored start/end is just the template
+  //       occurrence and is never auto-advanced, only the Calendar tab's
+  //       display copy is. Month-stepping clamps to end-of-month, so a
+  //       deadline anchored on the 31st stays on the 30th/28th as needed),
   //     school, link }   <- school/link are School-Applications-only fields
   //   Each section: { id, heading: "TUE 10/6", subheading: "Short section title",
   //     items: [ { time, title, detail, mapQuery } ] }
@@ -2650,19 +2652,31 @@
   // once that date passes. At render time, shift it forward by whole
   // intervals until it lands on the next occurrence at or after today --
   // the stored record itself is never mutated, only this display copy.
-  const RECUR_MONTHS = { yearly: 12, quarterly: 3 };
+  const RECUR_MONTHS = { yearly: 12, semiannual: 6, quarterly: 3, monthly: 1 };
+
+  // Month-stepping has to clamp to the end of the target month, or a
+  // deadline anchored on the 31st silently slides into the next month:
+  // Dec 31 + 6mo would land on Jul 1 instead of Jun 30, and Jan 31 + 1mo
+  // on Mar 3 instead of Feb 28.
+  function addMonthsClamped(d, months) {
+    const targetMonth = d.getMonth() + months;
+    const out = new Date(d.getFullYear(), targetMonth, 1);
+    const lastDay = new Date(out.getFullYear(), out.getMonth() + 1, 0).getDate();
+    out.setDate(Math.min(d.getDate(), lastDay));
+    return out;
+  }
+
   function expandRecurring(list) {
     return list.map(t => {
       const stepMonths = RECUR_MONTHS[t.recurring];
       if (!stepMonths) return t;
       const s = parseDate(t.start), e = parseDate(t.end);
       let steps = 0;
-      const shifted = (d, n) => new Date(d.getFullYear(), d.getMonth() + stepMonths * n, d.getDate());
-      while (shifted(e, steps) < today) steps++;
+      while (addMonthsClamped(e, stepMonths * steps) < today) steps++;
       if (steps === 0) return t;
       return Object.assign({}, t, {
-        start: fmtISO(shifted(s, steps)),
-        end: fmtISO(shifted(e, steps)),
+        start: fmtISO(addMonthsClamped(s, stepMonths * steps)),
+        end: fmtISO(addMonthsClamped(e, stepMonths * steps)),
       });
     });
   }
